@@ -1,12 +1,7 @@
 FROM python:3.12-slim-bookworm
 
-# Dependências do sistema para WeasyPrint, pdfplumber e lxml
+# Dependências do sistema para pdfplumber, lxml e psycopg2
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
-    libffi-dev \
-    shared-mime-info \
     libpq-dev \
     gcc \
     && rm -rf /var/lib/apt/lists/*

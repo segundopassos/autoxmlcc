@@ -2,7 +2,7 @@
 Views de geração de Ordem de Fornecimento em PDF — Etapa E6.
 RN15: Numeração automática a partir de 2027.
 RN16: Data de assinatura = primeiro dia útil.
-CA16-CA18: Geração de PDF com WeasyPrint.
+CA16-CA18: Geração de PDF com xhtml2pdf.
 """
 from django.contrib import messages
 from django.db import transaction

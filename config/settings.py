@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "ordens",
     "relatorios",
     "auditoria",
+    "seguranca",
 ]
 
 MIDDLEWARE = [
@@ -110,6 +111,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/admin/login/"
+
+# Segurança de cookies — produção exige True (HTTPS via Caddy)
+SESSION_COOKIE_SECURE = env("SESSION_COOKIE_SECURE", default=False)
+CSRF_COOKIE_SECURE = env("CSRF_COOKIE_SECURE", default=False)
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
 
 # Celery
 CELERY_BROKER_URL = env("REDIS_URL", default="redis://redis:6379/0")

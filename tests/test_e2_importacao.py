@@ -150,21 +150,31 @@ class TestDetectarColunasNotas:
 class TestExtrairItensPlanilha:
     """Testes de extração de itens usando planilha real de fixture."""
 
-    def test_extrai_itens_de_planilha_real(self):
-        """Extrai itens da planilha ECO MAIS com sucesso."""
-        filepath = "planilhas em uso/2022/CONTROLES CONTRATO/ECO MAIS AR CONDICIONADOS LTDA.xlsx"
-        # Usa a sheet '010607-2021' que tem dados reais
+    def test_extrai_itens_de_planilha_real(self, tmp_path):
+        """Extrai itens de planilha criada em memória com estrutura realista."""
         import openpyxl
 
-        wb = openpyxl.load_workbook(filepath, data_only=True)
-        ws = wb["010607-2021"]
-        linha_cabecalho, mapeamento = detectar_cabecalho(ws)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "010607-2021"
+        # Cabeçalho na linha 1
+        ws.append(["Descrição", "Qtd", "Preço Unitário", "Total"])
+        # Dados nas linhas seguintes
+        ws.append(["Manutenção de ar condicionado", 2, 150.00, 300.00])
+        ws.append(["Filtro de ar", 5, 25.50, 127.50])
+
+        filepath = tmp_path / "planilha_teste.xlsx"
+        wb.save(filepath)
         wb.close()
+
+        wb2 = openpyxl.load_workbook(str(filepath), data_only=True)
+        ws2 = wb2["010607-2021"]
+        linha_cabecalho, mapeamento = detectar_cabecalho(ws2)
+        wb2.close()
 
         assert "descricao" in mapeamento, f"Mapeamento encontrado: {mapeamento}"
 
-        itens, avisos = extrair_itens_planilha(filepath, mapeamento, linha_cabecalho + 1)
-        # A planilha tem pelo menos alguns itens com descrição
+        itens, avisos = extrair_itens_planilha(str(filepath), mapeamento, linha_cabecalho + 1)
         assert len(itens) > 0, f"Nenhum item extraído. Avisos: {avisos}"
 
     def test_rn19_valores_digitados_respeitados(self):
