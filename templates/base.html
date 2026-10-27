@@ -1,0 +1,63 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gestão Fiscal — SMS Campo Maior{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        /* Cores com significado fixo (CLAUDE.md) */
+        .color-ativo { @apply text-green-700 bg-green-50 border-green-200; }
+        .color-a-vencer { @apply text-yellow-700 bg-yellow-50 border-yellow-200; }
+        .color-vencido { @apply text-red-700 bg-red-50 border-red-200; }
+        .color-faturado { @apply text-blue-700 bg-blue-50 border-blue-200; }
+        /* Nomes nunca cortados com reticências */
+        .no-truncate { white-space: normal; overflow-wrap: break-word; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+    <!-- Menu lateral escuro -->
+    <aside class="w-64 bg-slate-900 text-white flex-shrink-0 flex flex-col min-h-screen">
+        <div class="p-6 border-b border-slate-700">
+            <h1 class="text-lg font-bold">Gestão Fiscal</h1>
+            <p class="text-sm text-slate-400">SMS Campo Maior</p>
+        </div>
+        <nav class="flex-1 p-4 space-y-1">
+            <a href="{% url 'contratos:painel' %}" class="block px-4 py-3 rounded hover:bg-slate-800 {% if request.resolver_match.url_name == 'painel' %}bg-slate-800{% endif %}">
+                Painel de contratos
+            </a>
+            <a href="#" class="block px-4 py-3 rounded hover:bg-slate-800 text-slate-400 cursor-not-allowed">Notas</a>
+            <a href="{% url 'contratos:empresa_list' %}" class="block px-4 py-3 rounded hover:bg-slate-800 {% if 'empresa' in request.resolver_match.url_name %}bg-slate-800{% endif %}">
+                Empresas
+            </a>
+            <a href="#" class="block px-4 py-3 rounded hover:bg-slate-800 text-slate-400 cursor-not-allowed">Relatórios</a>
+            <a href="#" class="block px-4 py-3 rounded hover:bg-slate-800 text-slate-400 cursor-not-allowed">Configurações</a>
+        </nav>
+        <div class="p-4 border-t border-slate-700 space-y-2">
+            <a href="{% url 'contratos:contrato_create' %}" class="block w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-medium">
+                Novo contrato
+            </a>
+            <p class="text-xs text-slate-500 text-center mt-4">CNPJ 11.753.492/0001-02</p>
+        </div>
+    </aside>
+
+    <!-- Conteúdo principal -->
+    <main class="flex-1 overflow-auto">
+        {% if messages %}
+        <div class="mx-6 mt-4 space-y-2">
+            {% for message in messages %}
+            <div class="px-4 py-3 rounded border {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800{% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800{% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="p-6">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</body>
+</html>

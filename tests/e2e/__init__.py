@@ -1,0 +1,1 @@
+# Testes end-to-end com Playwright — Etapa E9 Piloto

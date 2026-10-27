@@ -1,0 +1,29 @@
+# Django e extensões
+Django==5.2.*
+psycopg2-binary==2.9.*
+django-environ==0.11.*
+
+# Tarefas em segundo plano
+celery[redis]==5.4.*
+redis==5.1.*
+
+# Leitura de arquivos
+pdfplumber==0.11.*
+lxml==5.3.*
+openpyxl==3.1.*
+xlrd==2.0.*
+
+# Casamento de itens
+rapidfuzz==3.10.*
+
+# Geração de PDF
+WeasyPrint==62.*
+
+# Servidor de produção
+gunicorn==23.*
+
+# Testes
+pytest==8.3.*
+pytest-django==4.9.*
+playwright==1.48.*
+pytest-playwright==0.6.*

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}OF de Reserva — Gestão Fiscal{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-slate-800 mb-2">Criar OF de reserva</h1>
+  <p class="text-slate-600 mb-6">Contrato {{ contrato.numero }} — {{ contrato.empresa.razao_social }}</p>
+
+  <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-5 mb-6">
+    <h2 class="text-lg font-semibold text-yellow-800 mb-2">Como funciona a reserva</h2>
+    <p class="text-sm text-yellow-700">
+      A OF antecipada cria uma nota provisória que reserva saldo no contrato.
+      Quando a nota fiscal real chegar, você completa o número e a chave de acesso,
+      e a reserva vira faturamento definitivo.
+    </p>
+  </div>
+
+  <form method="post" class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+    {% csrf_token %}
+    <p class="text-sm text-slate-600 mb-4">
+      Confirme para criar a ordem de fornecimento de reserva. Os itens serão adicionados na próxima tela.
+    </p>
+    <div class="flex gap-3">
+      <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded font-medium transition">
+        Criar reserva
+      </button>
+      <a href="{% url 'contratos:contrato_detail' contrato.pk %}" class="border border-slate-300 text-slate-600 px-6 py-2 rounded hover:bg-slate-50 transition">
+        Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Liberar NF {{ nota.numero }} — Gestão Fiscal{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-6">
+ <h1 class="text-2xl font-bold text-slate-800 mb-2">Liberar nota fiscal</h1>
+ <p class="text-slate-600 mb-6">NF {{ nota.numero }} — {{ nota.empresa.razao_social }}</p>
+
+ <!-- Resumo das divergências -->
+ <div class="bg-red-50 border border-red-200 rounded-lg p-5 mb-6">
+ <h2 class="text-lg font-semibold text-red-800 mb-3">Divergências detectadas</h2>
+ <ul class="space-y-2">
+ {% for item in nota.itens.all %}
+ {% if item.divergencia %}
+ <li class="text-sm text-red-700 flex gap-2">
+ <span class="font-medium shrink-0">Item {{ forloop.counter }}:</span>
+ <span>{{ item.divergencia }}</span>
+ </li>
+ {% endif %}
+ {% endfor %}
+ </ul>
+ </div>
+
+ <!-- Formulário de liberação -->
+ <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+ <form method="post">
+ {% csrf_token %}
+
+ <div class="mb-4">
+ <label class="block text-sm font-medium text-slate-700 mb-2">
+ {{ form.justificativa.label }}
+ </label>
+ {{ form.justificativa }}
+ {% if form.justificativa.errors %}
+ <p class="text-red-600 text-xs mt-1">{{ form.justificativa.errors.0 }}</p>
+ {% endif %}
+ <p class="text-xs text-slate-500 mt-1">{{ form.justificativa.help_text }}</p>
+ </div>
+
+ <div class="flex gap-3">
+ <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-medium transition">
+ Liberar nota
+ </button>
+ <a href="{% url 'notas:nota_detail' nota.pk %}" class="border border-slate-300 text-slate-600 px-6 py-2 rounded hover:bg-slate-50 transition">
+ Cancelar
+ </a>
+ </div>
+ </form>
+ </div>
+</div>
+{% endblock %}

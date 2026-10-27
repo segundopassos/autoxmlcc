@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Excluir NF {{ nota.numero }} — Gestão Fiscal{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-red-700 mb-2">Excluir nota fiscal</h1>
+  <p class="text-slate-600 mb-6">NF {{ nota.numero }} — {{ nota.empresa.razao_social }}</p>
+
+  <div class="bg-red-50 border border-red-200 rounded-lg p-5 mb-6">
+    <h2 class="text-lg font-semibold text-red-800 mb-2">Atenção</h2>
+    <ul class="list-disc list-inside text-sm text-red-700 space-y-1">
+      <li>O saldo consumido por esta nota será devolvido ao contrato.</li>
+      <li>A ordem de fornecimento vinculada será excluída permanentemente.</li>
+      <li>Esta ação não pode ser desfeita.</li>
+    </ul>
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm mb-6">
+    <h3 class="font-medium text-slate-700 mb-3">Resumo da nota</h3>
+    <dl class="grid grid-cols-2 gap-4 text-sm">
+      <div><span class="text-slate-500">Número:</span> <span class="font-medium">{{ nota.numero }}</span></div>
+      <div><span class="text-slate-500">Data emissão:</span> <span class="font-medium">{{ nota.data_emissao|date:"d/m/Y" }}</span></div>
+      <div><span class="text-slate-500">Valor total:</span> <span class="font-medium">R$ {{ nota.valor_total|floatformat:2 }}</span></div>
+      <div><span class="text-slate-500">Status:</span> <span class="font-medium">{{ nota.get_status_display }}</span></div>
+    </dl>
+  </div>
+
+  <form method="post" class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+    {% csrf_token %}
+    <div class="mb-4 flex items-start gap-3">
+      {{ form.confirmacao }}
+      <label for="{{ form.confirmacao.id_for_label }}" class="text-sm text-slate-700">
+        {{ form.confirmacao.label }}
+      </label>
+    </div>
+    {% if form.confirmacao.errors %}
+      <p class="text-red-600 text-xs mb-4">{{ form.confirmacao.errors.0 }}</p>
+    {% endif %}
+
+    <div class="flex gap-3">
+      <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded font-medium transition">
+        Excluir nota
+      </button>
+      <a href="{% url 'notas:nota_detail' nota.pk %}" class="border border-slate-300 text-slate-600 px-6 py-2 rounded hover:bg-slate-50 transition">
+        Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

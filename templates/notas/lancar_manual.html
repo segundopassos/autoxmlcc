@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Lançar Nota Manual — Gestão Fiscal{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-slate-800 mb-6">Lançar nota fiscal (manual)</h1>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="mb-4 p-3 rounded text-sm {{ message.tags == 'error' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800' }}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" class="space-y-6">
+    {% csrf_token %}
+
+    <!-- Dados da nota -->
+    <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-700 mb-4">Dados da nota</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Empresa emitente</label>
+          {{ form.empresa }}
+          {% if form.empresa.errors %}<p class="text-red-600 text-xs mt-1">{{ form.empresa.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Contrato</label>
+          {{ form.contrato }}
+          {% if form.contrato.errors %}<p class="text-red-600 text-xs mt-1">{{ form.contrato.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Número</label>
+          {{ form.numero }}
+          {% if form.numero.errors %}<p class="text-red-600 text-xs mt-1">{{ form.numero.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Série</label>
+          {{ form.serie }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Data de emissão</label>
+          {{ form.data_emissao }}
+          {% if form.data_emissao.errors %}<p class="text-red-600 text-xs mt-1">{{ form.data_emissao.errors.0 }}</p>{% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-600 mb-1">Valor total (R$)</label>
+          {{ form.valor_total }}
+          {% if form.valor_total.errors %}<p class="text-red-600 text-xs mt-1">{{ form.valor_total.errors.0 }}</p>{% endif %}
+        </div>
+      </div>
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-slate-600 mb-1">Informações complementares</label>
+        {{ form.informacoes_complementares }}
+      </div>
+    </div>
+
+    <!-- Itens da nota -->
+    <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-700 mb-4">Itens da nota</h2>
+      {{ formset.management_form }}
+
+      <div id="itens-container" class="space-y-3">
+        {% for item_form in formset %}
+          <div class="border border-slate-100 rounded p-3 bg-slate-50 item-row">
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+              <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-slate-500 mb-1">Descrição</label>
+                {{ item_form.descricao }}
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Cód. fornecedor</label>
+                {{ item_form.codigo_fornecedor }}
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Unidade</label>
+                {{ item_form.unidade }}
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Quantidade</label>
+                {{ item_form.quantidade }}
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Vlr. unitário</label>
+                {{ item_form.valor_unitario }}
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Vlr. total</label>
+                {{ item_form.valor_total }}
+              </div>
+            </div>
+            {{ item_form.item_contrato_id }}
+            {% if item_form.DELETE %}
+              <div class="mt-2 flex items-center gap-2">
+                {{ item_form.DELETE }}
+                <span class="text-xs text-slate-500">Remover este item</span>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded font-medium transition">
+        Conferir nota
+      </button>
+      <a href="{% url 'contratos:painel' %}" class="border border-slate-300 text-slate-600 px-6 py-2 rounded hover:bg-slate-50 transition">
+        Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
