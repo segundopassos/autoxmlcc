@@ -1,0 +1,1285 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Contratos & Notas - SMS Campo Maior</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        ::-webkit-scrollbar { width: 7px; height: 7px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-100 flex h-screen overflow-hidden text-slate-800 antialiased">
+
+    <!-- OVERLAY DE CARREGAMENTO -->
+    <div id="loadingOverlay" style="display:none;" class="fixed inset-0 z-50 bg-slate-900/60 items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-[370px] shadow-2xl flex flex-col items-center text-center border border-slate-100">
+            <div class="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-3"></div>
+            <h4 id="loadingTitulo" class="font-bold text-slate-800 text-sm mb-1">Processando...</h4>
+            <p id="loadingSub" class="text-xs text-slate-500 mb-3">Aguarde a conclusão da operação.</p>
+        </div>
+    </div>
+
+    <!-- BARRA LATERAL -->
+    <aside class="w-64 bg-slate-900 text-white p-5 shadow-xl flex flex-col justify-between shrink-0 z-20">
+        <div>
+            <div class="flex items-center gap-3 px-2 mb-8 cursor-pointer group" onclick="voltarParaDashboard()">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg group-hover:bg-indigo-500 transition">
+                    <i class="fa-solid fa-file-shield text-lg text-white"></i>
+                </div>
+                <div>
+                    <span class="text-base font-bold tracking-tight block leading-none">Gestão Fiscal</span>
+                    <span class="text-[11px] text-slate-400">SMS Campo Maior</span>
+                </div>
+            </div>
+
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 mb-2">Cadastros & Planilhas</div>
+            <button type="button" onclick="abrirModalCadastro()" class="w-full flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium px-4 py-2.5 rounded-xl mb-2.5 text-xs transition border border-slate-700">
+                <i class="fa-solid fa-building text-indigo-400 w-4"></i> Cadastrar Empresa
+            </button>
+            <button type="button" onclick="abrirModalExcel()" class="w-full flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-medium px-4 py-2.5 rounded-xl mb-6 text-xs transition border border-slate-700">
+                <i class="fa-solid fa-file-excel w-4"></i> Subir Planilha de Itens
+            </button>
+
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 mb-2">Lançamento de Notas</div>
+            <button type="button" onclick="abrirModalXml()" class="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg mb-2.5 text-xs transition">
+                <i class="fa-solid fa-file-invoice"></i> Lançar XML / PDF Digital
+            </button>
+            <button type="button" onclick="abrirModalManual()" class="w-full flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold px-4 py-2.5 rounded-xl text-xs transition border border-slate-700">
+                <i class="fa-solid fa-table-list text-amber-400 w-4"></i> Manual / Colar Tabela IA
+            </button>
+        </div>
+
+        <div class="border-t border-slate-800 pt-3 text-[11px] text-slate-400 space-y-1">
+            <button type="button" onclick="voltarParaDashboard()" class="w-full text-left hover:text-white py-1 transition"><i class="fa-solid fa-house mr-1"></i> Painel de Contratos</button>
+            <div class="font-mono text-[10px] text-slate-500">CNPJ: 11.753.492/0001-02</div>
+        </div>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL -->
+    <main class="flex-1 flex flex-col overflow-hidden min-w-0">
+
+        <!-- VISÃO 1: DASHBOARD -->
+        <div id="visaoDashboard" class="flex-1 p-6 overflow-y-auto">
+            <header class="mb-5 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Secretaria Municipal de Saúde de Campo Maior</h2>
+                        <p class="text-xs text-slate-500">Controle de Contratos, Conciliação por Descrição + Valor Unitário e Emissão de O.F.</p>
+                    </div>
+                    <span id="contadorContratos" class="text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-3.5 py-1.5 rounded-full">Carregando...</span>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100">
+                    <div class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                        <button type="button" onclick="abaContratos('GERAL')" id="btnGeral" class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 bg-white text-indigo-600 shadow-sm">
+                            <i class="fa-solid fa-layer-group"></i> Todos
+                        </button>
+                        <button type="button" onclick="abaContratos('ATIVOS')" id="btnAtivos" class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-500 hover:text-slate-700">
+                            <i class="fa-solid fa-circle-check text-emerald-500"></i> Ativos
+                        </button>
+                        <button type="button" onclick="abaContratos('VENCIDOS')" id="btnVencidos" class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-500 hover:text-slate-700">
+                            <i class="fa-solid fa-circle-xmark text-red-500"></i> Vencidos
+                        </button>
+                    </div>
+                    <div class="relative w-72">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="filtroPesquisa" onkeyup="filtrarContratos()" placeholder="Pesquisar contrato, empresa ou CNPJ..."
+                               class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+            </header>
+
+            <div id="gridContratos" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+        </div>
+
+        <!-- VISÃO 2: PLANILHA DO CONTRATO -->
+        <div id="visaoContratoPlanilha" class="hidden flex-1 flex flex-col bg-white overflow-hidden">
+            <header class="bg-white border-b border-slate-200 px-6 py-4 flex flex-col gap-3 shrink-0">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <button onclick="voltarParaDashboard()" class="p-2 hover:bg-slate-100 rounded-lg text-slate-600" title="Voltar aos Contratos">
+                            <i class="fa-solid fa-arrow-left text-lg"></i>
+                        </button>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-xl font-bold text-slate-800" id="viewEmpresaNome">EMPRESA</h2>
+                                <button onclick="abrirEdicaoContrato()" class="text-slate-400 hover:text-indigo-600 text-sm" title="Editar dados"><i class="fa-solid fa-pen-to-square"></i></button>
+                            </div>
+                            <p class="text-xs text-slate-500" id="viewContratoSub">Contrato 00/0000 | CNPJ: ...</p>
+                            <p class="text-[11px] text-slate-400" id="viewVigencia">Vigência: ...</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="abrirGavetaNotas()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg text-xs flex items-center gap-2">
+                            <i class="fa-solid fa-receipt"></i>
+                            <span id="badgeQtdNotas">Ver Notas (0)</span>
+                        </button>
+                        <button onclick="abrirAditivoPrazo()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-lg text-xs flex items-center gap-2">
+                            <i class="fa-solid fa-calendar-plus"></i>
+                            <span>Aditivo Prazo</span>
+                        </button>
+                        <button onclick="excluirContratoAtual()" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-lg text-xs flex items-center gap-2">
+                            <i class="fa-solid fa-trash-can"></i>
+                            <span>Excluir</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <div class="relative w-80">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="filtroItens" onkeyup="filtrarItens()" placeholder="Buscar produto ou código..."
+                                   class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border rounded-lg text-xs focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500 font-semibold flex gap-2" id="resumoSaldos"></div>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-auto bg-slate-50 p-4">
+                <div class="bg-white border rounded-xl shadow-sm overflow-hidden">
+                    <table class="w-full text-left text-xs border-collapse font-mono">
+                        <thead class="bg-slate-100 sticky top-0 border-b text-slate-700 uppercase font-sans">
+                            <tr>
+                                <th class="p-2.5 border-r w-12 text-center">Item</th>
+                                <th class="p-2.5 border-r">Descrição Oficial do Contrato</th>
+                                <th class="p-2.5 border-r text-right w-24">Qtd Contratada</th>
+                                <th class="p-2.5 border-r text-right w-24 text-purple-700">Aditivo</th>
+                                <th class="p-2.5 border-r text-right w-24 text-blue-700">Qtd Faturada</th>
+                                <th class="p-2.5 border-r text-right w-24 font-bold">Saldo Disp.</th>
+                                <th class="p-2.5 border-r text-right w-24">Val. Unitário</th>
+                                <th class="p-2.5 border-r text-right w-28">Fat. Real (R$)</th>
+                                <th class="p-2.5 border-r text-right w-28">Saldo Fin. (R$)</th>
+                                <th class="p-2.5 w-32">Status</th>
+                                <th class="p-2.5 w-24 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyPlanilha" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- GAVETA LATERAL: NOTAS FISCAIS -->
+    <div id="gavetaNotas" class="hidden fixed inset-0 z-50 bg-black/30 backdrop-blur-xs flex justify-end">
+        <div class="w-96 bg-white h-full shadow-2xl p-6 flex flex-col justify-between">
+            <div>
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="font-bold text-slate-800 text-sm">Notas Fiscais Registradas</h3>
+                    <button onclick="document.getElementById('gavetaNotas').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div id="listaNotasContrato" class="space-y-3 overflow-y-auto max-h-[75vh]"></div>
+            </div>
+            <p class="text-[11px] text-slate-400 text-center">Excluir uma nota estorna as quantidades de volta ao saldo.</p>
+        </div>
+    </div>
+
+    <!-- MODAL CADASTRAR EMPRESA/CONTRATO -->
+    <div id="modalCadastro" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-[500px] p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-800">Cadastrar Novo Contrato</h3>
+                <button onclick="fecharModalCadastro()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="formCadastroManual" onsubmit="salvarCadastroManual(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nome da Empresa</label>
+                    <input type="text" id="cadEmpresa" required class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Número do Contrato</label>
+                    <input type="text" id="cadContrato" required placeholder="Ex: 07.2909/2025" class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">CNPJ</label>
+                    <input type="text" id="cadCnpj" required placeholder="00.000.000/0000-00" class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Início Vigência</label>
+                        <input type="date" id="cadInicio" class="w-full border rounded-lg p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Fim Vigência</label>
+                        <input type="date" id="cadFim" class="w-full border rounded-lg p-2 text-sm">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="fecharModalCadastro()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm">Salvar Contrato</button>
+                </div>
+            </form>
+
+            <!-- Zona de Upload da Lista Mestra TCE -->
+            <div class="mt-6 pt-4 border-t border-slate-200">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-file-import text-emerald-600"></i>
+                    <h4 class="text-sm font-bold text-slate-700">Importar Lista Mestra (TCE)</h4>
+                </div>
+                <p class="text-[11px] text-slate-500 mb-3">Suba a planilha <strong>contratos_saude_vigentes.xlsx</strong> para cadastrar empresas e contratos automaticamente.</p>
+                <div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:border-emerald-400 transition cursor-pointer" onclick="document.getElementById('inputListaMestra').click()">
+                    <input type="file" id="inputListaMestra" accept=".xlsx" class="hidden" onchange="importarListaMestra(this)">
+                    <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400 mb-2"></i>
+                    <p class="text-xs font-semibold text-slate-600">Clique para selecionar o arquivo</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Formato: .xlsx (Excel)</p>
+                </div>
+                <div id="resultadoListaMestra" class="hidden mt-3 p-3 rounded-lg text-xs"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL IMPORTAR EXCEL -->
+    <div id="modalExcel" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-[550px] p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-800">Importar Planilha de Itens</h3>
+                <button onclick="fecharModalExcel()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="formImportarExcel" onsubmit="importarPlan(event)" class="space-y-3">
+                <div class="relative">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Selecione o Contrato Destino</label>
+                    <input type="hidden" id="contratoIdSelecionadoImport">
+                    <input type="text" id="buscaContratoImportInput" onfocus="mostrarDropdownContratosImport()" oninput="filtrarDropdownContratosImport()" placeholder="Digite para buscar contrato..." class="w-full border rounded-lg p-2 text-sm">
+                    <div id="dropdownContratosImport" class="hidden absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                </div>
+                <div id="boxContratoSelecionadoInfo" class="hidden bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs"></div>
+                <div id="alertaDivergenciaPlanilha" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-800"></div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Arquivo Excel (.xlsx)</label>
+                    <input type="file" id="inputArquivosItens" name="arquivo" accept=".xlsx" required onchange="verificarCompatibilidadePlanilha()" class="w-full text-sm border rounded-lg p-2">
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="chkModoSomarItens" class="rounded">
+                    <label for="chkModoSomarItens" class="text-xs text-slate-600">Modo Somar (adiciona aos itens existentes)</label>
+                </div>
+                <!-- Adaptação de itens entre contratos -->
+                <div class="pt-3 mt-2 border-t border-slate-200">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-clone text-indigo-500"></i>
+                        <span class="text-xs font-bold text-slate-700">Adaptar Itens de Outro Contrato</span>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mb-2">Copie a estrutura de itens (descrição, lote, preço) de um contrato anterior para este. As quantidades começam zeradas.</p>
+                    <div class="flex gap-2">
+                        <select id="selectContratoOrigem" class="flex-1 border rounded-lg p-2 text-xs">
+                            <option value="">-- Selecione o contrato origem --</option>
+                        </select>
+                        <button type="button" onclick="adaptarItensContrato()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg whitespace-nowrap">
+                            <i class="fa-solid fa-copy mr-1"></i> Copiar Itens
+                        </button>
+                    </div>
+                    <div id="resultadoAdaptacao" class="hidden mt-2 p-2 rounded-lg text-xs"></div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="fecharModalExcel()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-sm">Importar Itens</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL LANÇAMENTO XML -->
+    <div id="modalXml" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-[1050px] max-h-[92vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800">Conferência de Nota Fiscal (XML/PDF)</h3>
+                    <p class="text-xs text-slate-500" id="xmlHeader">Selecione o arquivo para processamento automático</p>
+                </div>
+                <button onclick="fecharModalXml()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div id="xmlUpload" class="p-8 border-2 border-dashed border-slate-300 rounded-xl text-center mb-4">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-500 mb-2"></i>
+                <p class="text-sm font-medium text-slate-700">Selecione ou arraste arquivos XML/PDF da NF-e</p>
+                <input type="file" id="inputXmlFiles" accept=".xml,.pdf" multiple onchange="enviarXmlMultiplo(this.files)" class="mt-3 text-sm">
+            </div>
+
+            <div id="xmlErrosGerais" class="text-xs text-red-600 mb-2"></div>
+
+            <div id="xmlTable" class="hidden flex-1 overflow-y-auto border rounded-xl mb-4">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-slate-100 sticky top-0 border-b">
+                        <tr>
+                            <th class="p-2.5">Item Faturado no XML</th>
+                            <th class="p-2.5 w-16 text-center">Qtd NF</th>
+                            <th class="p-2.5 w-20">Valor NF</th>
+                            <th class="p-2.5">Destino: Item Vinculado no Contrato</th>
+                            <th class="p-2.5 w-20 text-right">Saldo Atual</th>
+                            <th class="p-2.5 w-36">Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="linhasConferencia" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+
+            <div id="xmlFooter" class="hidden flex justify-between items-center pt-2 border-t">
+                <div id="contadoresStatus" class="text-xs font-semibold flex gap-3"></div>
+                <div class="flex gap-2">
+                    <button onclick="fecharModalXml()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100">Descartar</button>
+                    <button onclick="confirmarGravacaoXml()" id="btnConfirmarXml" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-sm">Confirmar & Gravar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL LANÇAMENTO MANUAL -->
+    <div id="modalManual" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-[950px] max-h-[92vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 class="text-lg font-bold text-slate-800">Lançamento Manual / Colar Tabela IA</h3>
+                <button onclick="fecharModalManual()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Contrato Destino</label>
+                    <select id="manContratoSelect" onchange="trocarContratoNoModalManual(this.value)" class="w-full border rounded-lg p-2 text-sm"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Número da NF / Recibo</label>
+                    <input type="text" id="manNf" class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Data de Emissão</label>
+                    <input type="date" id="manData" class="w-full border rounded-lg p-2 text-sm">
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Cole aqui a tabela gerada pela IA ou texto da NFS-e</label>
+                <textarea id="manTextoIa" rows="3" placeholder="Ex: ITEM 01 - MANUTENÇÃO | 4 | 60,00&#10;Ou cole tabela Markdown/CSV..." class="w-full border rounded-lg p-2 text-xs font-mono"></textarea>
+                <button type="button" onclick="interpretarTextoIaNoManual()" class="mt-2 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Interpretar Texto / Tabela IA
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto border rounded-xl mb-4">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-slate-100 sticky top-0 border-b">
+                        <tr>
+                            <th class="p-2.5 w-32">Referência</th>
+                            <th class="p-2.5">Item do Contrato</th>
+                            <th class="p-2.5 w-20 text-center">Qtd</th>
+                            <th class="p-2.5 w-24 text-right">Val. Unit.</th>
+                            <th class="p-2.5 w-24 text-right">Subtotal</th>
+                            <th class="p-2.5 w-32">Diagnóstico</th>
+                            <th class="p-2.5 w-12 text-center">Remover</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyLinhasManuais" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between items-center pt-2 border-t">
+                <div class="text-xs font-semibold">
+                    <span id="manTotalItensCount">0</span> itens | Total: <span id="manValorTotalNota" class="text-indigo-700">R$ 0,00</span>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="adicionarLinhaManual()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 border border-slate-200">
+                        <i class="fa-solid fa-plus mr-1"></i> Adicionar Linha
+                    </button>
+                    <button type="button" onclick="salvarNotaManualMultipla()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-sm">
+                        <i class="fa-solid fa-save mr-1"></i> Salvar Nota Fiscal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ADITIVO DE ITEM -->
+    <div id="modalAditivo" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-[500px] p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-800">Aditivo / Editar Item</h3>
+                <button onclick="fecharModalAditivo()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="formAditivoItem" onsubmit="salvarAditivo(event)" class="space-y-3">
+                <input type="hidden" id="aditId">
+                <div class="bg-slate-50 p-2 rounded-lg text-xs font-semibold text-slate-700" id="aditNome">Item</div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Descrição</label>
+                    <textarea id="aditDescEdit" rows="2" class="w-full border rounded-lg p-2 text-sm"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Qtd Contratada</label>
+                        <input type="number" step="0.0001" id="aditContratadaEdit" class="w-full border rounded-lg p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Aditivo Atual: <span id="lblAditivoAtual">0</span></label>
+                        <select id="aditModo" class="w-full border rounded-lg p-2 text-sm">
+                            <option value="SOMAR">Somar ao aditivo</option>
+                            <option value="SUBSTITUIR">Substituir aditivo</option>
+                            <option value="ZERAR">Zerar aditivo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Qtd Aditivo (nova)</label>
+                        <input type="number" step="0.0001" id="aditQtd" class="w-full border rounded-lg p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Preço Unitário</label>
+                        <input type="number" step="0.0001" id="aditPreco" class="w-full border rounded-lg p-2 text-sm">
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="chkCriarNovoItemPreco" class="rounded">
+                    <label for="chkCriarNovoItemPreco" class="text-xs text-slate-600">Criar novo histórico se preço mudar</label>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="zerarAditivoItem()" class="px-4 py-2 rounded-lg text-sm text-amber-600 hover:bg-amber-50">Zerar Aditivo</button>
+                    <button type="button" onclick="excluirItemContrato()" class="px-4 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50">Excluir Item</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL ADITIVO PRAZO -->
+    <div id="modalPrazo" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-[400px] p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-800">Aditivo de Prazo</h3>
+                <button onclick="fecharModalPrazo()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="formAditivoPrazo" onsubmit="salvarNovoPrazo(event)" class="space-y-3">
+                <div class="text-xs text-slate-600">Prazo atual: <strong id="prazoAtualLbl">-</strong></div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Nova Data de Fim</label>
+                    <input type="date" id="novoPrazo" required class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="fecharModalPrazo()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm">Salvar Prazo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let contratos = [];
+        let atual = null;
+        let itens = [];
+        let notas_globais = [];
+        let xmlsProcessados = [];
+        let linhasManuais = [];
+        let catalogoManualAtual = [];
+        let viewMode = 'GERAL';
+        let haDivergenciaPlanilhaAtual = false;
+        let msgDivergenciaPlanilhaAtual = "";
+
+        function mostrarLoading(titulo, sub) {
+            document.getElementById('loadingTitulo').innerText = titulo || 'Processando...';
+            document.getElementById('loadingSub').innerText = sub || 'Aguarde...';
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+        function esconderLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function round4(v) { return Math.round((parseFloat(v) || 0) * 10000) / 10000; }
+        function formatBR(v) {
+            if (v === null || v === undefined) return '0,00';
+            return parseFloat(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function formatIntQtd(v) {
+            if (v === null || v === undefined) return '0';
+            const n = parseFloat(v);
+            if (Number.isInteger(n)) return n.toLocaleString('pt-BR');
+            return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 4 });
+        }
+        function formatarCNPJ(c) {
+            if (!c) return '-';
+            const d = c.replace(/\D/g, '');
+            if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+            return c;
+        }
+        function formatarDataBR(d) {
+            if (!d) return '-';
+            const parts = d.split('-');
+            if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
+            return d;
+        }
+
+        async function init() {
+            mostrarLoading('Carregando...', 'Buscando contratos...');
+            try {
+                const r = await fetch('/api/contratos');
+                contratos = await r.json();
+                filtrarContratos();
+            } catch(e) { alert('Erro ao carregar contratos.'); }
+            finally { esconderLoading(); }
+        }
+
+        function abaContratos(modo) {
+            viewMode = modo;
+            ['Geral', 'Ativos', 'Vencidos'].forEach(m => {
+                const btn = document.getElementById('btn' + m);
+                if (m.toUpperCase() === modo) {
+                    btn.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 bg-white text-indigo-600 shadow-sm';
+                } else {
+                    btn.className = 'px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-500 hover:text-slate-700';
+                }
+            });
+            filtrarContratos();
+        }
+
+        function filtrarContratos() {
+            const termo = document.getElementById('filtroPesquisa').value.toLowerCase();
+            let filtrados = contratos.filter(c => {
+                const matchTexto = !termo || c.nome_empresa.toLowerCase().includes(termo) || c.numero_contrato.toLowerCase().includes(termo) || formatarCNPJ(c.cnpj).toLowerCase().includes(termo);
+                let matchStatus = true;
+                if (viewMode === 'ATIVOS') matchStatus = c.status !== 'VENCIDO';
+                if (viewMode === 'VENCIDOS') matchStatus = c.status === 'VENCIDO';
+                return matchTexto && matchStatus;
+            });
+            const nomeCat = viewMode === 'GERAL' ? 'Todos os Contratos' : (viewMode === 'ATIVOS' ? 'Contratos Ativos' : 'Contratos Vencidos');
+            document.getElementById('contadorContratos').innerText = nomeCat + ': ' + filtrados.length;
+            desenharCards(filtrados);
+        }
+
+        function desenharCards(lista) {
+            const d = document.getElementById('gridContratos');
+            if (lista.length === 0) {
+                d.innerHTML = '<div class="col-span-full bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-xs">Nenhum contrato encontrado para este filtro.</div>';
+                return;
+            }
+            let htmlBatch = '';
+            for (let i = 0; i < lista.length; i++) {
+                const c = lista[i];
+                const isVenc = c.status === 'VENCIDO';
+                const badgeStatus = isVenc
+                    ? '<span class="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-md">VENCIDO</span>'
+                    : '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">ATIVO</span>';
+
+                htmlBatch += `<div class="contrato-card bg-white border ${isVenc ? 'border-red-200' : 'border-slate-200'} rounded-2xl p-4 cursor-pointer hover:border-indigo-500 hover:shadow-md transition flex flex-col justify-between" onclick="abrir(${c.id})">
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="text-xs font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg">Contrato Nº ${c.numero_contrato}</span>
+                            ${badgeStatus}
+                        </div>
+                        <h4 class="font-bold text-slate-800 text-xs leading-snug break-words mb-2">${c.nome_empresa}</h4>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
+                        <div class="font-mono text-slate-600">CNPJ: ${formatarCNPJ(c.cnpj)}</div>
+                        <div class="flex justify-between items-center">
+                            <span>Venc: <strong>${formatarDataBR(c.data_fim)}</strong></span>
+                            <span class="font-bold ${c.total_itens > 0 ? 'text-indigo-600' : 'text-slate-400'}">${c.total_itens} itens</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            d.innerHTML = htmlBatch;
+        }
+
+        async function abrir(id) {
+            try {
+                mostrarLoading('Abrindo Contrato...', 'Calculando saldos físicos e financeiros...');
+                const r = await fetch('/api/contrato/' + id);
+                const d = await r.json();
+                atual = d.contrato; itens = d.itens; notas_globais = d.notas;
+
+                document.getElementById('visaoDashboard').classList.add('hidden');
+                document.getElementById('visaoContratoPlanilha').classList.remove('hidden');
+                document.getElementById('viewEmpresaNome').innerText = atual.nome_empresa;
+                document.getElementById('viewContratoSub').innerText = 'Contrato Nº ' + atual.numero_contrato + '  •  CNPJ: ' + formatarCNPJ(atual.cnpj);
+                document.getElementById('viewVigencia').innerText = 'Vigência: ' + formatarDataBR(atual.data_inicio) + ' a ' + formatarDataBR(atual.data_fim);
+                document.getElementById('badgeQtdNotas').innerText = 'Notas e O.F. (' + notas_globais.length + ')';
+
+                document.getElementById('filtroItens').value = '';
+                filtrarItens();
+                desenharNotas(notas_globais);
+            } catch(e) { alert('Erro ao abrir contrato.'); }
+            finally { esconderLoading(); }
+        }
+
+        function filtrarItens() {
+            const termo = document.getElementById('filtroItens').value.toLowerCase();
+            const tb = document.getElementById('tbodyPlanilha');
+            let totalFinanceiroContratado = 0, totalFinanceiroFaturado = 0, totalFinanceiroDisponivel = 0;
+            let rowsHtml = '';
+
+            for (let i = 0; i < itens.length; i++) {
+                const it = itens[i];
+                const qtdTotal = round4(it.qnt_contratada + it.qnt_aditivada);
+                const dispQtd = round4(qtdTotal - it.qnt_faturada);
+
+                const totalContratadoItem = round4(qtdTotal * it.val_unitario);
+                const totalFaturadoItem = round4(it.valor_total_faturado_real);
+                const valorDispFinanceiro = round4(totalContratadoItem - totalFaturadoItem);
+
+                let statusTexto = 'Saldo OK';
+                let badgeStatus = '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800">Saldo OK</span>';
+                if (dispQtd < 0) {
+                    statusTexto = 'Estourou ' + (it.nota_que_esgotou || '');
+                    badgeStatus = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-600 text-white block leading-tight">ESTOUROU (${formatIntQtd(dispQtd)})<br><span class="text-[9px] font-normal">Na ${it.nota_que_esgotou || 'NF'}</span></span>`;
+                } else if (dispQtd === 0 && qtdTotal > 0) {
+                    statusTexto = 'Zerou ' + (it.nota_que_esgotou || '');
+                    badgeStatus = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-800 border border-red-300 block leading-tight">ESGOTADO (0)<br><span class="text-[9px]">Na ${it.nota_que_esgotou || 'NF'}</span></span>`;
+                }
+
+                if (termo && !it.descricao.toLowerCase().includes(termo) && !statusTexto.toLowerCase().includes(termo) && !String(it.val_unitario).includes(termo)) continue;
+
+                totalFinanceiroContratado += totalContratadoItem;
+                totalFinanceiroFaturado += totalFaturadoItem;
+                totalFinanceiroDisponivel += Math.max(0, valorDispFinanceiro);
+
+                let bgRow = dispQtd <= 0 ? 'bg-red-50 text-red-950 font-medium' : 'hover:bg-slate-50';
+
+                rowsHtml += `<tr class="${bgRow}">
+                    <td class="p-2.5 border-r border-slate-200 text-center font-bold text-slate-500">${it.item_num||'-'}</td>
+                    <td class="p-2.5 border-r border-slate-200 font-semibold">${it.descricao}</td>
+                    <td class="p-2.5 border-r border-slate-200 text-right font-mono">${formatIntQtd(it.qnt_contratada)}</td>
+                    <td class="p-2.5 border-r border-slate-200 text-right text-purple-700 font-bold font-mono">${it.qnt_aditivada > 0 ? '+'+formatIntQtd(it.qnt_aditivada) : (it.qnt_aditivada < 0 ? formatIntQtd(it.qnt_aditivada) : '-')}</td>
+                    <td class="p-2.5 border-r border-slate-200 text-right text-blue-700 font-bold font-mono">${formatIntQtd(it.qnt_faturada)}</td>
+                    <td class="p-2.5 border-r border-slate-200 text-right font-extrabold font-mono ${dispQtd <= 0 ? 'text-red-700' : 'text-slate-900'}">${formatIntQtd(dispQtd)}</td>
+                    <td class="p-2.5 border-r border-slate-200 text-right text-slate-600 font-mono">R$ ${formatBR(it.val_unitario)}</td>
+                    <td class="p-2.5 border-r border-slate-200 text-right text-blue-900 font-mono">R$ ${formatBR(totalFaturadoItem)}</td>
+                    <td class="p-2.5 border-r border-slate-200 text-right font-bold ${valorDispFinanceiro <= 0 ? 'text-red-600' : 'text-emerald-700'} font-mono">R$ ${formatBR(valorDispFinanceiro)}</td>
+                    <td class="p-2 border-r border-slate-200 text-center">${badgeStatus}</td>
+                    <td class="p-2 text-center">
+                        <button type="button" onclick="abrirAdit(${it.id})" class="px-2 py-1 bg-white text-indigo-700 text-[11px] font-bold rounded-lg border border-indigo-200 hover:bg-indigo-50 transition">
+                            Aditivo / Editar
+                        </button>
+                    </td>
+                </tr>`;
+            }
+            tb.innerHTML = rowsHtml || '<tr><td colspan="11" class="p-8 text-center text-slate-400">Nenhum item cadastrado neste contrato. Abra o menu "Opções" > "Subir / Substituir Planilha".</td></tr>';
+
+            document.getElementById('resumoSaldos').innerHTML = `
+                <span class="bg-slate-100 px-2.5 py-1 rounded-lg">Global: <strong>R$ ${formatBR(totalFinanceiroContratado)}</strong></span>
+                <span class="bg-blue-50 px-2.5 py-1 rounded-lg text-blue-900">Faturado: <strong>R$ ${formatBR(totalFinanceiroFaturado)}</strong></span>
+                <span class="bg-emerald-50 px-2.5 py-1 rounded-lg text-emerald-900 border border-emerald-200">Saldo Disp.: <strong>R$ ${formatBR(totalFinanceiroDisponivel)}</strong></span>
+            `;
+        }
+
+        function voltarParaDashboard() {
+            document.getElementById('visaoContratoPlanilha').classList.add('hidden');
+            document.getElementById('visaoDashboard').classList.remove('hidden');
+            atual = null;
+            init();
+        }
+
+        function abrirModalCadastro() { document.getElementById('modalCadastro').classList.remove('hidden'); }
+        function fecharModalCadastro() { document.getElementById('formCadastroManual').reset(); document.getElementById('modalCadastro').classList.add('hidden'); }
+
+        async function importarListaMestra(inputEl) {
+            const arquivo = inputEl.files[0];
+            if (!arquivo) return;
+            const resDiv = document.getElementById('resultadoListaMestra');
+            resDiv.classList.remove('hidden');
+            resDiv.className = 'mt-3 p-3 rounded-lg text-xs bg-slate-100 text-slate-600';
+            resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Processando lista mestra...';
+            try {
+                const fd = new FormData();
+                fd.append('arquivo', arquivo);
+                const resp = await fetch('/api/importar_lista_mestra', { method: 'POST', body: fd });
+                const data = await resp.json();
+                if (data.ok) {
+                    resDiv.className = 'mt-3 p-3 rounded-lg text-xs bg-emerald-50 text-emerald-800 border border-emerald-200';
+                    resDiv.innerHTML = `<i class="fa-solid fa-check mr-1"></i> Importação concluída:<br>` +
+                        `<strong>${data.empresas_criadas}</strong> empresas criadas, <strong>${data.empresas_atualizadas}</strong> atualizadas<br>` +
+                        `<strong>${data.contratos_criados}</strong> contratos criados, <strong>${data.contratos_atualizados}</strong> atualizados` +
+                        (data.erros && data.erros.length ? `<br><span class="text-amber-700 mt-1 block">${data.erros.length} aviso(s): ${data.erros[0]}</span>` : '');
+                    init(); // recarrega dashboard
+                } else {
+                    resDiv.className = 'mt-3 p-3 rounded-lg text-xs bg-red-50 text-red-800 border border-red-200';
+                    resDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> ${data.erro || 'Erro desconhecido'}`;
+                }
+            } catch (err) {
+                resDiv.className = 'mt-3 p-3 rounded-lg text-xs bg-red-50 text-red-800 border border-red-200';
+                resDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> Erro de conexão: ${err.message}`;
+            }
+            inputEl.value = '';
+        }
+
+        async function salvarCadastroManual(e) {
+            e.preventDefault();
+            mostrarLoading('Salvando Contrato...', 'Gravando na base...');
+            const payload = {
+                empresa: document.getElementById('cadEmpresa').value,
+                contrato: document.getElementById('cadContrato').value,
+                cnpj: document.getElementById('cadCnpj').value,
+                inicio: document.getElementById('cadInicio').value,
+                fim: document.getElementById('cadFim').value
+            };
+            await fetch('/api/contrato/cadastrar', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+            esconderLoading(); fecharModalCadastro(); init();
+        }
+
+        function abrirModalExcel() {
+            document.getElementById('formImportarExcel').reset();
+            document.getElementById('alertaDivergenciaPlanilha').classList.add('hidden');
+            document.getElementById('resultadoAdaptacao').classList.add('hidden');
+            haDivergenciaPlanilhaAtual = false;
+            if (atual) selecionarContratoNoDropdown(atual.id);
+            else {
+                document.getElementById('contratoIdSelecionadoImport').value = '';
+                document.getElementById('boxContratoSelecionadoInfo').classList.add('hidden');
+            }
+            // Popula select de contratos origem para adaptação
+            const selOrigem = document.getElementById('selectContratoOrigem');
+            selOrigem.innerHTML = '<option value="">-- Selecione o contrato origem --</option>';
+            contratos.forEach(c => {
+                if (atual && c.id === atual.id) return; // Não mostrar o próprio contrato como origem
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.numero_contrato} - ${c.nome_empresa}`;
+                selOrigem.appendChild(opt);
+            });
+            document.getElementById('modalExcel').classList.remove('hidden');
+        }
+        function fecharModalExcel() { document.getElementById('formImportarExcel').reset(); document.getElementById('modalExcel').classList.add('hidden'); document.getElementById('resultadoAdaptacao').classList.add('hidden'); }
+
+        async function adaptarItensContrato() {
+            const origemId = document.getElementById('selectContratoOrigem').value;
+            const destinoId = document.getElementById('contratoIdSelecionadoImport').value;
+            const resDiv = document.getElementById('resultadoAdaptacao');
+            if (!origemId) return alert('Selecione o contrato origem.');
+            if (!destinoId) return alert('Selecione o contrato destino na lista acima.');
+            resDiv.classList.remove('hidden');
+            resDiv.className = 'mt-2 p-2 rounded-lg text-xs bg-slate-100 text-slate-600';
+            resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Copiando itens...';
+            try {
+                const resp = await fetch(`/api/contrato/${origemId}/transferir_itens`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ destino_id: parseInt(destinoId) })
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    resDiv.className = 'mt-2 p-2 rounded-lg text-xs bg-emerald-50 text-emerald-800 border border-emerald-200';
+                    resDiv.innerHTML = `<i class="fa-solid fa-check mr-1"></i> <strong>${data.itens_copiados}</strong> itens copiados com sucesso.`;
+                } else {
+                    resDiv.className = 'mt-2 p-2 rounded-lg text-xs bg-red-50 text-red-800 border border-red-200';
+                    resDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> ${data.erro || 'Erro desconhecido'}`;
+                }
+            } catch (err) {
+                resDiv.className = 'mt-2 p-2 rounded-lg text-xs bg-red-50 text-red-800 border border-red-200';
+                resDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1"></i> Erro: ${err.message}`;
+            }
+        }
+
+        function mostrarDropdownContratosImport() {
+            filtrarDropdownContratosImport();
+            document.getElementById('dropdownContratosImport').classList.remove('hidden');
+        }
+        function filtrarDropdownContratosImport() {
+            const termo = document.getElementById('buscaContratoImportInput').value.toLowerCase().trim();
+            const box = document.getElementById('dropdownContratosImport');
+            box.classList.remove('hidden');
+
+            const lista = contratos.filter(c => {
+                if (!termo) return true;
+                return c.nome_empresa.toLowerCase().includes(termo) || c.numero_contrato.toLowerCase().includes(termo) || formatarCNPJ(c.cnpj).toLowerCase().includes(termo);
+            }).slice(0, 60);
+
+            if (lista.length === 0) {
+                box.innerHTML = '<div class="p-3 text-xs text-slate-400 text-center">Nenhum contrato localizado.</div>';
+                return;
+            }
+            box.innerHTML = lista.map(c => `
+                <div onclick="selecionarContratoNoDropdown(${c.id})" class="p-2.5 hover:bg-indigo-50 cursor-pointer transition">
+                    <div class="font-extrabold text-indigo-700 text-xs">Contrato Nº ${c.numero_contrato} &bull; CNPJ: ${formatarCNPJ(c.cnpj)}</div>
+                    <div class="text-xs font-semibold text-slate-800 break-words leading-snug">${c.nome_empresa}</div>
+                </div>
+            `).join('');
+        }
+        function selecionarContratoNoDropdown(id) {
+            const c = contratos.find(x => x.id === id);
+            if (!c) return;
+            document.getElementById('contratoIdSelecionadoImport').value = c.id;
+            document.getElementById('buscaContratoImportInput').value = 'Nº ' + c.numero_contrato + ' — ' + c.nome_empresa;
+            document.getElementById('dropdownContratosImport').classList.add('hidden');
+
+            const infoBox = document.getElementById('boxContratoSelecionadoInfo');
+            infoBox.classList.remove('hidden');
+            infoBox.innerHTML = `
+                <div class="font-bold text-indigo-950 break-words"><i class="fa-solid fa-circle-check text-indigo-600 mr-1"></i> Contrato Selecionado: Nº ${c.numero_contrato} — ${c.nome_empresa}</div>
+                <div class="text-[11px] text-indigo-700 font-mono mt-0.5">CNPJ: ${formatarCNPJ(c.cnpj)} &bull; Vigência: ${formatarDataBR(c.data_inicio)} a ${formatarDataBR(c.data_fim)}</div>
+            `;
+            verificarCompatibilidadePlanilha();
+        }
+
+        async function verificarCompatibilidadePlanilha() {
+            const cId = parseInt(document.getElementById('contratoIdSelecionadoImport').value);
+            const files = document.getElementById('inputArquivosItens').files;
+            const alertaDiv = document.getElementById('alertaDivergenciaPlanilha');
+            alertaDiv.classList.add('hidden');
+            haDivergenciaPlanilhaAtual = false;
+            msgDivergenciaPlanilhaAtual = '';
+            if (!cId || files.length === 0) return;
+
+            const fd = new FormData();
+            fd.append('contrato_id', cId);
+            fd.append('arquivo', files[0]);
+            try {
+                const r = await fetch('/api/verificar_planilha_contrato', {method: 'POST', body: fd});
+                const d = await r.json();
+                if (d.aviso) {
+                    haDivergenciaPlanilhaAtual = true;
+                    msgDivergenciaPlanilhaAtual = d.aviso;
+                    alertaDiv.classList.remove('hidden');
+                    alertaDiv.innerHTML = `
+                        <div class="font-bold text-amber-900"><i class="fa-solid fa-triangle-exclamation mr-1"></i> ALERTA DE POSSÍVEL CONTRATO DIFERENTE:</div>
+                        <div class="font-medium">${d.aviso}</div>
+                    `;
+                }
+            } catch(e) {}
+        }
+
+        async function importarPlan(e) {
+            e.preventDefault();
+            const id = parseInt(document.getElementById('contratoIdSelecionadoImport').value);
+            if (!id) return alert('Selecione o contrato correspondente na lista antes de enviar.');
+            if (haDivergenciaPlanilhaAtual) {
+                if (!confirm('ATENÇÃO — DIVERGÊNCIA DETECTADA:\n' + msgDivergenciaPlanilhaAtual + '\nDeseja vincular esta planilha a este contrato mesmo assim?')) {
+                    return;
+                }
+            }
+            const fd = new FormData(e.target);
+            fd.append('contrato_id', id);
+            fd.append('modo_somar', document.getElementById('chkModoSomarItens').checked ? 'true' : 'false');
+            try {
+                mostrarLoading('Processando...', 'Importando e padronizando itens...');
+                const r = await fetch('/api/importar_itens', {method: 'POST', body: fd});
+                const d = await r.json();
+                esconderLoading();
+                if (d.ok) {
+                    fecharModalExcel();
+                    abrir(id);
+                } else {
+                    alert(d.erro || 'Erro ao importar.');
+                }
+            } catch(err) { esconderLoading(); alert(err.message); }
+        }
+
+        function abrirAdit(id) {
+            const it = itens.find(x => x.id === id);
+            if (!it) return;
+            document.getElementById('aditId').value = it.id;
+            document.getElementById('aditNome').innerText = '#' + (it.item_num || '-') + ' ' + it.descricao;
+            document.getElementById('lblAditivoAtual').innerText = formatIntQtd(it.qnt_aditivada || 0);
+            document.getElementById('aditModo').value = 'SOMAR';
+            document.getElementById('aditQtd').value = '';
+            document.getElementById('aditDescEdit').value = it.descricao;
+            document.getElementById('aditContratadaEdit').value = it.qnt_contratada;
+            document.getElementById('aditPreco').value = it.val_unitario;
+            document.getElementById('chkCriarNovoItemPreco').checked = false;
+            document.getElementById('modalAditivo').classList.remove('hidden');
+        }
+        function fecharModalAditivo() { document.getElementById('formAditivoItem').reset(); document.getElementById('modalAditivo').classList.add('hidden'); }
+
+        async function zerarAditivoItem() {
+            const id = document.getElementById('aditId').value;
+            if (!confirm('Zerar/Remover o aditivo deste item?')) return;
+            mostrarLoading('Zerando Aditivo...', 'Recalculando...');
+            await fetch('/api/aditivo/' + id + '/zerar', {method: 'POST'});
+            esconderLoading(); fecharModalAditivo(); abrir(atual.id);
+        }
+        async function excluirItemContrato() {
+            const id = document.getElementById('aditId').value;
+            if (!confirm('Excluir esta linha de item do contrato?')) return;
+            mostrarLoading('Excluindo...', 'Atualizando...');
+            await fetch('/api/item/' + id, {method: 'DELETE'});
+            esconderLoading(); fecharModalAditivo(); abrir(atual.id);
+        }
+        async function salvarAditivo(e) {
+            e.preventDefault();
+            mostrarLoading('Salvando...', 'Recalculando saldos...');
+            const id = document.getElementById('aditId').value;
+            const payload = {
+                modo: document.getElementById('aditModo').value,
+                quantidade: parseFloat(document.getElementById('aditQtd').value || 0),
+                descricao: document.getElementById('aditDescEdit').value,
+                qnt_contratada: parseFloat(document.getElementById('aditContratadaEdit').value || 0),
+                preco: parseFloat(document.getElementById('aditPreco').value || 0),
+                criar_novo_se_preco_mudar: document.getElementById('chkCriarNovoItemPreco').checked
+            };
+            await fetch('/api/aditivo/' + id, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+            esconderLoading(); fecharModalAditivo(); abrir(atual.id);
+        }
+
+        function abrirAditivoPrazo() { document.getElementById('prazoAtualLbl').innerText = formatarDataBR(atual.data_fim); document.getElementById('novoPrazo').value = ''; document.getElementById('modalPrazo').classList.remove('hidden'); }
+        function fecharModalPrazo() { document.getElementById('formAditivoPrazo').reset(); document.getElementById('modalPrazo').classList.add('hidden'); }
+        async function salvarNovoPrazo(e) {
+            e.preventDefault();
+            const nv = document.getElementById('novoPrazo').value;
+            if (!nv) return;
+            mostrarLoading('Salvando Prazo...', 'Gravando vigência...');
+            await fetch('/api/contrato/' + atual.id + '/prazo', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({data_fim: nv})});
+            esconderLoading(); fecharModalPrazo(); abrir(atual.id);
+        }
+
+        function abrirGavetaNotas() { document.getElementById('gavetaNotas').classList.remove('hidden'); }
+        function desenharNotas(notas) {
+            const container = document.getElementById('listaNotasContrato');
+            container.innerHTML = '';
+            if (notas.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Nenhuma nota fiscal lançada ainda.</p>';
+                return;
+            }
+            notas.forEach(n => {
+                container.innerHTML += `
+                    <div class="border rounded-xl p-3 bg-slate-50 flex justify-between items-center text-xs">
+                        <div>
+                            <div class="font-bold text-slate-800">NF-e Nº ${n.numero_nf}</div>
+                            <div class="text-slate-400 text-[10px]">Emitida em: ${formatarDataBR(n.data_emissao)} | R$ ${formatBR(n.valor_total)}</div>
+                        </div>
+                        <button onclick="removerNotaFiscal(${n.id}, '${n.numero_nf}')" class="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50" title="Excluir nota e devolver saldo">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        async function removerNotaFiscal(notaId, numeroNF) {
+            if (!confirm(`Deseja remover a Nota Fiscal Nº ${numeroNF}? O saldo dos itens será estornado automaticamente!`)) return;
+            const res = await fetch(`/api/nota/${notaId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.ok) {
+                alert(`Nota ${numeroNF} removida e saldos estornados.`);
+                abrir(atual.id);
+            }
+        }
+
+        async function excluirContratoAtual() {
+            if (!confirm(`ATENÇÃO: Deseja apagar definitivamente o contrato da empresa ${atual.nome_empresa}? Todos os itens e notas serão excluídos!`)) return;
+            const res = await fetch(`/api/contrato/${atual.id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.ok) {
+                alert('Contrato apagado com sucesso.');
+                voltarParaDashboard();
+            }
+        }
+
+        // === LANÇAMENTO MANUAL ===
+        async function abrirModalManual() {
+            const selCont = document.getElementById('manContratoSelect');
+            selCont.innerHTML = contratos.map(c => `<option value="${c.id}" ${atual && atual.id === c.id ? 'selected' : ''}>Nº ${c.numero_contrato} — ${c.nome_empresa}</option>`).join('');
+            document.getElementById('manNf').value = '';
+            document.getElementById('manData').value = new Date().toISOString().slice(0,10);
+            document.getElementById('manTextoIa').value = '';
+            linhasManuais = [];
+
+            const cid = parseInt(selCont.value);
+            if (atual && atual.id === cid) {
+                catalogoManualAtual = itens;
+            } else if (cid) {
+                const r = await fetch('/api/contrato/' + cid);
+                const d = await r.json();
+                catalogoManualAtual = d.itens || [];
+            }
+            adicionarLinhaManual();
+            document.getElementById('modalManual').classList.remove('hidden');
+        }
+        function fecharModalManual() { document.getElementById('modalManual').classList.add('hidden'); }
+        async function trocarContratoNoModalManual(novoIdStr) {
+            const cid = parseInt(novoIdStr);
+            if (!cid) return;
+            mostrarLoading('Carregando Itens...', 'Buscando catálogo do contrato...');
+            const r = await fetch('/api/contrato/' + cid);
+            const d = await r.json();
+            esconderLoading();
+            catalogoManualAtual = d.itens || [];
+            renderizarLinhasManuais();
+        }
+        function adicionarLinhaManual() {
+            linhasManuais.push({ desc_ref: 'Inserção direta', item_contrato_id: null, qtd: 1, val_unit: 0 });
+            renderizarLinhasManuais();
+        }
+        function removerLinhaManual(idx) {
+            linhasManuais.splice(idx, 1);
+            renderizarLinhasManuais();
+        }
+        function selecionarItemNaLinhaManual(idx, itemIdStr) {
+            const id = parseInt(itemIdStr) || null;
+            linhasManuais[idx].item_contrato_id = id;
+            const itemC = catalogoManualAtual.find(x => x.id === id);
+            if (itemC && (!linhasManuais[idx].val_unit || linhasManuais[idx].val_unit <= 0)) {
+                linhasManuais[idx].val_unit = itemC.val_unitario;
+            }
+            renderizarLinhasManuais();
+        }
+        function atualizarValorLinhaManual(idx, campo, valor) {
+            linhasManuais[idx][campo] = parseFloat(valor) || 0;
+            renderizarLinhasManuais();
+        }
+        function renderizarLinhasManuais() {
+            const tb = document.getElementById('tbodyLinhasManuais');
+            let somaNota = 0;
+            let html = '';
+
+            linhasManuais.forEach((l, idx) => {
+                const sub = round4((l.qtd || 0) * (l.val_unit || 0));
+                somaNota += sub;
+
+                let opts = '<option value="">-- Selecione o Item (Nome + Valor) --</option>';
+                catalogoManualAtual.forEach(c => {
+                    const disp = round4((c.qnt_contratada + c.qnt_aditivada) - c.qnt_faturada);
+                    const sel = (l.item_contrato_id === c.id) ? 'selected' : '';
+                    opts += `<option value="${c.id}" ${sel}>#${c.item_num || '-'} ${c.descricao} | R$ ${formatBR(c.val_unitario)} (Disp: ${formatIntQtd(disp)})</option>`;
+                });
+
+                let diagHtml = '<span class="text-[11px] font-bold text-amber-700">Escolha o item</span>';
+                const itemC = catalogoManualAtual.find(x => x.id === l.item_contrato_id);
+                if (itemC) {
+                    const dispAntes = round4((itemC.qnt_contratada + itemC.qnt_aditivada) - itemC.qnt_faturada);
+                    const dispDepois = round4(dispAntes - (l.qtd || 0));
+                    if (dispDepois < 0) {
+                        diagHtml = `<span class="px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold block">ESTOUROU (${formatIntQtd(dispDepois)})</span>`;
+                    } else if (dispDepois === 0) {
+                        diagHtml = `<span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold block">ZEROU SALDO (0)</span>`;
+                    } else {
+                        diagHtml = `<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold block">OK (Restam ${formatIntQtd(dispDepois)})</span>`;
+                    }
+                }
+
+                html += `<tr class="hover:bg-slate-50">
+                    <td class="p-2 border-r text-[11px] text-slate-600 font-medium">${l.desc_ref || '-'}</td>
+                    <td class="p-2 border-r">
+                        <select onchange="selecionarItemNaLinhaManual(${idx}, this.value)" class="w-full border border-slate-300 rounded-lg p-1.5 text-xs bg-white font-semibold">
+                            ${opts}
+                        </select>
+                    </td>
+                    <td class="p-2 border-r">
+                        <input type="number" step="0.0001" value="${l.qtd}" oninput="atualizarValorLinhaManual(${idx}, 'qtd', this.value)" class="w-full border border-slate-300 rounded-lg p-1.5 text-xs text-center font-mono font-bold">
+                    </td>
+                    <td class="p-2 border-r">
+                        <input type="text" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${l.val_unit}" oninput="atualizarValorLinhaManual(${idx}, 'val_unit', this.value)" class="w-full border border-slate-300 rounded-lg p-1.5 text-xs text-right font-mono">
+                    </td>
+                    <td class="p-2 border-r text-right font-mono font-bold text-slate-800">R$ ${formatBR(sub)}</td>
+                    <td class="p-2 border-r text-center">${diagHtml}</td>
+                    <td class="p-2 text-center">
+                        <button type="button" onclick="removerLinhaManual(${idx})" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                </tr>`;
+            });
+
+            tb.innerHTML = html || '<tr><td colspan="7" class="p-6 text-center text-slate-400">Adicione uma linha ou cole a tabela da IA acima.</td></tr>';
+            document.getElementById('manTotalItensCount').innerText = linhasManuais.length;
+            document.getElementById('manValorTotalNota').innerText = 'R$ ' + formatBR(somaNota);
+        }
+
+        async function interpretarTextoIaNoManual() {
+            const texto = document.getElementById('manTextoIa').value.trim();
+            const cid = parseInt(document.getElementById('manContratoSelect').value);
+            if (!texto) return alert('Cole o texto ou a tabela gerada pela IA primeiro.');
+            if (!cid) return alert('Selecione um contrato destino.');
+
+            mostrarLoading('Lendo Tabela / Texto...', 'Casando itens por Descrição e Valor Unitário...');
+            const r = await fetch('/api/nfse/analisar_texto', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    texto: texto,
+                    numero_nf: document.getElementById('manNf').value || 'S/N',
+                    data_emissao: document.getElementById('manData').value,
+                    contexto_id: cid
+                })
+            });
+            const d = await r.json();
+            esconderLoading();
+            if (!d.ok || !d.notas || d.notas.length === 0) {
+                return alert(d.erro || 'Não foi possível extrair itens. Certifique-se de que cada linha tenha Descrição, Quantidade e Valor Unitário.');
+            }
+            const notaExtraida = d.notas[0];
+            linhasManuais = notaExtraida.itens.map(it => ({
+                desc_ref: it.desc_xml,
+                item_contrato_id: it.item_contrato_id,
+                qtd: it.qtd_xml,
+                val_unit: it.val_xml
+            }));
+            renderizarLinhasManuais();
+        }
+
+        async function salvarNotaManualMultipla() {
+            const cid = parseInt(document.getElementById('manContratoSelect').value);
+            const nf = document.getElementById('manNf').value.trim();
+            const dt = document.getElementById('manData').value;
+            if (!cid) return alert('Selecione o contrato.');
+            if (!nf) return alert('Informe o número da Nota Fiscal / Recibo.');
+            if (linhasManuais.length === 0) return alert('Adicione pelo menos um item na nota.');
+            const semVinculo = linhasManuais.find(l => !l.item_contrato_id || l.qtd <= 0);
+            if (semVinculo) return alert('Todos os itens da lista precisam estar vinculados a um item do contrato e ter quantidade maior que zero.');
+
+            const somaTotal = round4(linhasManuais.reduce((acc, l) => acc + (l.qtd * l.val_unit), 0));
+            const notaPayload = {
+                notas: [{
+                    contrato_id: cid,
+                    numero_nf: nf,
+                    serie: 'MANUAL',
+                    data_emissao: dt,
+                    chave_acesso: 'MANUAL-' + nf + '-' + Date.now(),
+                    valor_total: somaTotal,
+                    itens: linhasManuais.map(l => ({
+                        item_contrato_id: l.item_contrato_id,
+                        qtd_xml: l.qtd,
+                        val_xml: l.val_unit,
+                        desc_xml: l.desc_ref
+                    }))
+                }]
+            };
+
+            mostrarLoading('Salvando Nota Fiscal...', 'Descontando itens e recalculando saldos...');
+            const r = await fetch('/api/xml/gravar_multiplo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(notaPayload)
+            });
+            const d = await r.json();
+            esconderLoading();
+            if (d.ok) {
+                fecharModalManual();
+                abrir(cid);
+            } else {
+                alert(d.erro || 'Erro ao gravar nota.');
+            }
+        }
+
+        // === MOTOR DE UPLOAD XML / PDF ===
+        function abrirModalXml() {
+            document.getElementById('modalXml').classList.remove('hidden');
+            document.getElementById('inputXmlFiles').value='';
+            document.getElementById('xmlUpload').classList.remove('hidden');
+            document.getElementById('xmlTable').classList.add('hidden');
+            document.getElementById('xmlFooter').classList.add('hidden');
+            document.getElementById('xmlErrosGerais').innerText = '';
+        }
+        function fecharModalXml() { document.getElementById('inputXmlFiles').value=''; document.getElementById('modalXml').classList.add('hidden'); }
+
+        async function enviarXmlMultiplo(files) {
+            if (files.length === 0) return;
+            document.getElementById('xmlErrosGerais').innerText = '';
+            const fd = new FormData();
+            for (let i=0; i<files.length; i++) { fd.append('arquivos', files[i]); }
+            if (atual) fd.append('contexto_id', atual.id);
+
+            try {
+                mostrarLoading('Extraindo e Conciliando...', 'Processando arquivos XML/PDF...');
+                const r = await fetch('/api/xml/analisar_multiplo', {method: 'POST', body: fd});
+                const d = await r.json();
+                esconderLoading();
+                if (!d.ok && (!d.notas || d.notas.length === 0)) { alert(d.erro); fecharModalXml(); return; }
+                exibirResultadoConferenciaNotas(d);
+            } catch(e) { esconderLoading(); alert(e.message); fecharModalXml(); }
+        }
+
+        function exibirResultadoConferenciaNotas(d) {
+            xmlsProcessados = d.notas || [];
+            if (d.erros && d.erros.length > 0) document.getElementById('xmlErrosGerais').innerText = 'Atenção: ' + d.erros.join(' | ');
+
+            if (xmlsProcessados.length > 0) {
+                document.getElementById('xmlUpload').classList.add('hidden');
+                document.getElementById('xmlTable').classList.remove('hidden');
+                document.getElementById('xmlFooter').classList.remove('hidden');
+                document.getElementById('xmlHeader').innerText = 'Conferência de Lançamento: ' + xmlsProcessados.length + ' Nota(s) Fiscal(is)';
+                renderizarTabelaXmlConferencia();
+            } else {
+                fecharModalXml();
+                if (d.erros && d.erros.length > 0) alert('Aviso: ' + d.erros.join(' | '));
+            }
+        }
+
+        function renderizarTabelaXmlConferencia() {
+            const tbody = document.getElementById('linhasConferencia');
+            tbody.innerHTML = '';
+            let contOk = 0, contEstouro = 0, contPendente = 0;
+
+            xmlsProcessados.forEach((nota, notaIdx) => {
+                nota.itens.forEach((it, itemIdx) => {
+                    let badgeClass = 'bg-emerald-100 text-emerald-700';
+                    if (it.status_cor === 'red') { badgeClass = 'bg-red-600 text-white font-bold'; contEstouro++; }
+                    else if (it.status_cor === 'amber') { badgeClass = 'bg-amber-100 text-amber-700 font-bold'; contPendente++; }
+                    else if (it.status_cor === 'blue') { badgeClass = 'bg-blue-100 text-blue-700 font-bold'; contOk++; }
+                    else { contOk++; }
+
+                    let opcoesSelect = `<option value="">-- Selecione o item correto do contrato --</option>`;
+                    if (nota.itens_contrato_disponiveis) {
+                        nota.itens_contrato_disponiveis.forEach(op => {
+                            const sel = (op.id === it.item_contrato_id) ? 'selected' : '';
+                            opcoesSelect += `<option value="${op.id}" ${sel}>#${op.item_num || '-'} - ${op.descricao} (R$ ${formatBR(op.val_unitario)})</option>`;
+                        });
+                    }
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50 border-b border-slate-100">
+                            <td class="p-2.5 font-medium">${it.desc_xml}</td>
+                            <td class="p-2.5 font-bold text-center">${formatIntQtd(it.qtd_xml)}</td>
+                            <td class="p-2.5">R$ ${formatBR(it.val_xml)}</td>
+                            <td class="p-2.5">
+                                <select onchange="atualizarVinculoManual(${notaIdx}, ${itemIdx}, this.value)" class="w-full text-xs border rounded p-1 bg-white focus:ring-1 focus:ring-indigo-500">
+                                    ${opcoesSelect}
+                                </select>
+                            </td>
+                            <td class="p-2.5 text-right font-medium">${it.saldo_antes !== null ? formatIntQtd(it.saldo_antes) : '-'}</td>
+                            <td class="p-2.5">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] ${badgeClass}">${it.situacao}</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+
+            document.getElementById('contadoresStatus').innerHTML = `
+                <span class="text-emerald-700"><i class="fa-solid fa-circle-check mr-1"></i> OK: ${contOk}</span>
+                <span class="text-red-700"><i class="fa-solid fa-circle-exclamation mr-1"></i> Estouro/Esgotado: ${contEstouro}</span>
+                <span class="text-amber-700"><i class="fa-solid fa-circle-question mr-1"></i> Pendente: ${contPendente}</span>
+            `;
+        }
+
+        function atualizarVinculoManual(notaIdx, itemIdx, novoItemId) {
+            if (!novoItemId) {
+                xmlsProcessados[notaIdx].itens[itemIdx].item_contrato_id = null;
+                xmlsProcessados[notaIdx].itens[itemIdx].situacao = 'NÃO ENCONTRADO';
+                return;
+            }
+            xmlsProcessados[notaIdx].itens[itemIdx].item_contrato_id = parseInt(novoItemId);
+            xmlsProcessados[notaIdx].itens[itemIdx].situacao = 'ASSOCIADO MANUALMENTE';
+        }
+
+        async function confirmarGravacaoXml() {
+            if (!xmlsProcessados || xmlsProcessados.length === 0) return;
+            const payload = {
+                notas: xmlsProcessados.map(n => ({
+                    contrato_id: n.contrato_id,
+                    numero_nf: n.numero_nf,
+                    serie: n.serie,
+                    data_emissao: n.data_emissao,
+                    chave_acesso: n.chave_acesso,
+                    valor_total: n.valor_total,
+                    itens: n.itens
+                }))
+            };
+            mostrarLoading('Gravando Notas...', 'Atualizando saldos...');
+            const r = await fetch('/api/xml/gravar_multiplo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const d = await r.json();
+            esconderLoading();
+            if (d.ok) {
+                alert('Nota(s) Fiscal(is) gravada(s) e saldos atualizados com sucesso!');
+                fecharModalXml();
+                if (atual) abrir(atual.id);
+                else init();
+            } else {
+                alert('Erro: ' + d.erro);
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

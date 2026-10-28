@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "relatorios",
     "auditoria",
     "seguranca",
+    "api",
 ]
 
 MIDDLEWARE = [

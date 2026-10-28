@@ -18,7 +18,17 @@ from .forms import EmpresaForm, ContratoForm
 
 def painel_contratos(request):
     """
-    Painel principal com cartões de contratos.
+    Painel principal — agora serve o template SPA (Single Page Application).
+    Toda a lógica de filtragem, abas e renderização acontece via JavaScript
+    consumindo a API JSON em /api/contratos.
+    """
+    return render(request, "spa.html")
+
+
+def painel_contratos_legacy(request):
+    """
+    [LEGADO] Painel principal com cartões de contratos (server-side rendering).
+    Mantido para referência durante a transição para SPA.
     Abas: Geral, Ativos, A vencer em 30 dias, Vencidos.
     Busca por empresa, nº do contrato, CNPJ ou item.
     """

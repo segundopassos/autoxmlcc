@@ -213,7 +213,5 @@ class TestDesempenhoPainel:
         # Painel deve carregar em menos de 5 segundos
         assert duracao < 5.0, f"Painel demorou {duracao:.2f}s para carregar"
 
-        # Verifica que os contratos aparecem (paginado: 50 por página)
-        expect(page.locator(".contrato-card")).to_have_count(50)
-        # Verifica que a paginação existe
-        expect(page.locator("text=Página 1 de")).to_be_visible()
+        # Verifica que os contratos aparecem (SPA: todos renderizados client-side)
+        expect(page.locator(".contrato-card")).to_have_count(100)
