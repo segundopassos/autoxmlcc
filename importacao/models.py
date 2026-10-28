@@ -135,3 +135,49 @@ class MapeamentoSalvo(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+class HistoricoHashArquivo(models.Model):
+    """
+    Registro de hashes SHA-256 de arquivos importados para prevenção de duplicidade.
+    RN25: Bloqueia reimportação de planilhas ou notas fiscais idênticas.
+    """
+
+    TIPO_CHOICES = [
+        ("PLANILHA", "Planilha de Itens"),
+        ("NOTA_FISCAL", "Nota Fiscal (XML/PDF)"),
+        ("MESTRE", "Planilha Mestre"),
+    ]
+
+    contrato = models.ForeignKey(
+        "contratos.Contrato",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="historico_hashes",
+        verbose_name="Contrato associado",
+    )
+    tipo = models.CharField(
+        max_length=15,
+        choices=TIPO_CHOICES,
+        verbose_name="Tipo de arquivo",
+    )
+    nome_arquivo = models.CharField(max_length=255, verbose_name="Nome do arquivo")
+    hash_sha256 = models.CharField(
+        max_length=64, db_index=True, verbose_name="Hash SHA-256"
+    )
+    data_upload = models.DateTimeField(auto_now_add=True, verbose_name="Data de upload")
+
+    class Meta:
+        verbose_name = "Histórico de Hash de Arquivo"
+        verbose_name_plural = "Históricos de Hash de Arquivos"
+        ordering = ["-data_upload"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["hash_sha256", "tipo", "contrato"],
+                name="unique_hash_tipo_contrato",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.tipo} — {self.nome_arquivo[:30]} ({self.hash_sha256[:8]}...)"

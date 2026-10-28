@@ -62,6 +62,11 @@ class NotaFiscal(models.Model):
     justificativa_liberacao = models.TextField(
         blank=True, verbose_name="Justificativa de liberação",
     )
+    hash_sha256 = models.CharField(
+        max_length=64, blank=True, null=True, db_index=True,
+        verbose_name="Hash SHA-256 do arquivo de origem",
+        help_text="Usado para bloquear duplicidade de upload (RN25).",
+    )
     pdf_anexo = models.FileField(upload_to="notas/pdf/", blank=True, null=True)
     informacoes_complementares = models.TextField(blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)

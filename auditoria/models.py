@@ -74,4 +74,5 @@ class RegistroAuditoria(models.Model):
 
     def __str__(self):
         usuario_nome = self.usuario.get_full_name() if self.usuario else "Sistema"
-        return f"{self.get_acao_display()} — {self.entidade} ({usuario_nome}, {self.criado_em:%d/%m/%Y %H:%M})"
+        data_str = self.criado_em.strftime("%d/%m/%Y %H:%M") if self.criado_em else "sem data"
+        return f"{self.get_acao_display()} — {self.entidade} ({usuario_nome}, {data_str})"

@@ -9,12 +9,12 @@
 
 <!-- Abas -->
 <div class="flex space-x-1 mb-4 border-b border-gray-200">
-  {% for key, label in [("geral", "Geral"), ("ativos", "Ativos"), ("a_vencer", "A vencer em 30 dias"), ("vencidos", "Vencidos")] %}
-  <a href="?aba={{ key }}{% if busca %}&q={{ busca }}{% endif %}{% if ano %}&ano={{ ano }}{% endif %}"
-     class="px-4 py-2 text-sm font-medium rounded-t {% if aba == key %}bg-white border border-b-0 border-gray-200 text-emerald-700 -mb-px{% else %}text-gray-500 hover:text-gray-700{% endif %}">
-    {{ label }}
-    <span class="ml-1 px-2 py-0.5 rounded-full text-xs {% if aba == key %}bg-emerald-100 text-emerald-800{% else %}bg-gray-100 text-gray-600{% endif %}">
-      {{ contagens[key] }}
+  {% for aba_item in abas %}
+  <a href="?aba={{ aba_item.key }}{% if busca %}&q={{ busca }}{% endif %}{% if ano %}&ano={{ ano }}{% endif %}"
+     class="px-4 py-2 text-sm font-medium rounded-t {% if aba == aba_item.key %}bg-white border border-b-0 border-gray-200 text-emerald-700 -mb-px{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+    {{ aba_item.label }}
+    <span class="ml-1 px-2 py-0.5 rounded-full text-xs {% if aba == aba_item.key %}bg-emerald-100 text-emerald-800{% else %}bg-gray-100 text-gray-600{% endif %}">
+      {{ aba_item.count }}
     </span>
   </a>
   {% endfor %}
@@ -42,7 +42,7 @@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
   {% for contrato in contratos %}
   <a href="{% url 'contratos:contrato_detail' contrato.pk %}"
-     class="block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+     class="contrato-card block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
     <div class="flex justify-between items-start mb-2">
       <span class="text-sm font-mono text-slate-600">{{ contrato.numero }}</span>
       {% if contrato.situacao == "ativo" %}
@@ -55,13 +55,40 @@
     </div>
     <h3 class="font-semibold text-slate-800 no-truncate mb-1">{{ contrato.empresa.razao_social }}</h3>
     <p class="text-sm text-slate-500 mb-3">{{ contrato.empresa.cnpj }}</p>
-    <div class="flex justify-between text-xs text-slate-500">
+    <!-- Barra de saldo consumido -->
+    {% widthratio contrato.total_faturado contrato.total_contratado 100 as pct %}
+    <div class="mt-3 mb-2">
+      <div class="flex justify-between text-xs mb-1">
+        <span class="text-slate-500">Saldo consumido</span>
+        <span class="font-mono {% if pct >= 100 %}text-red-600{% elif pct >= 80 %}text-yellow-600{% else %}text-green-600{% endif %}">{{ pct|default:"0" }}%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2">
+        <div class="h-2 rounded-full {% if pct >= 100 %}bg-red-500{% elif pct >= 80 %}bg-yellow-500{% else %}bg-green-500{% endif %}" style="width: {{ pct|default:0 }}%"></div>
+      </div>
+    </div>
+
+    <div class="flex justify-between text-xs text-slate-500 mt-2">
       <span>Vigência: {{ contrato.inicio_vigencia|date:"d/m/Y" }} a {{ contrato.fim_vigencia|date:"d/m/Y" }}</span>
-      <span>{{ contrato.itens.count }} itens</span>
+      <span>{{ contrato.itens.count }} itens · {{ contrato.notas.count }} NFs</span>
     </div>
   </a>
   {% endfor %}
 </div>
+
+<!-- Paginação CA20 -->
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center items-center gap-2 mt-6">
+  {% if page_obj.has_previous %}
+  <a href="?aba={{ aba }}{% if busca %}&q={{ busca }}{% endif %}{% if ano %}&ano={{ ano }}{% endif %}&page={{ page_obj.previous_page_number }}"
+     class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">Anterior</a>
+  {% endif %}
+  <span class="text-sm text-gray-600">Página {{ page_obj.number }} de {{ paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a href="?aba={{ aba }}{% if busca %}&q={{ busca }}{% endif %}{% if ano %}&ano={{ ano }}{% endif %}&page={{ page_obj.next_page_number }}"
+     class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">Próxima</a>
+  {% endif %}
+</div>
+{% endif %}
 {% else %}
 <div class="text-center py-12 bg-white border border-dashed border-gray-300 rounded-lg">
   <p class="text-gray-500 mb-3">Nenhum contrato encontrado.</p>

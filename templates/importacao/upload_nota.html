@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Importar Nota Fiscal — Gestão Fiscal{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8 px-4">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">Importar Nota Fiscal</h1>
+
+    {% if messages %}
+    <div class="mb-4 space-y-2">
+        {% for message in messages %}
+        <div class="p-3 rounded text-sm
+            {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+            {% elif message.tags == 'success' %}bg-green-50 text-green-700 border border-green-200
+            {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="bg-white shadow rounded-lg p-6 space-y-4">
+        {% csrf_token %}
+
+        <div>
+            <label for="contrato_id" class="block text-sm font-medium text-gray-700 mb-1">
+                Contrato (opcional)
+            </label>
+            <select name="contrato_id" id="contrato_id"
+                    class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                <option value="">— Selecione um contrato —</option>
+                {% for c in contratos %}
+                <option value="{{ c.pk }}">{{ c.numero }} — {{ c.empresa.razao_social }}</option>
+                {% endfor %}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Selecione o contrato ao qual esta nota pertence.</p>
+        </div>
+
+        <div>
+            <label for="arquivo" class="block text-sm font-medium text-gray-700 mb-1">
+                Arquivo da Nota Fiscal
+            </label>
+            <input type="file" name="arquivo" id="arquivo" accept=".xml,.pdf" required
+                   class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
+            <p class="text-xs text-gray-500 mt-1">Formatos aceitos: XML (.xml) ou PDF (.pdf).</p>
+        </div>
+
+        <div class="pt-2">
+            <button type="submit"
+                    class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 font-medium transition-colors">
+                Importar Nota Fiscal
+            </button>
+        </div>
+    </form>
+
+    <div class="mt-6 text-center">
+        <a href="{% url 'importacao:importar' %}" class="text-sm text-indigo-600 hover:text-indigo-800">
+            ← Voltar para importação de planilhas
+        </a>
+    </div>
+</div>
+{% endblock %}

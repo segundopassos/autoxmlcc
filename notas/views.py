@@ -44,14 +44,17 @@ def lancar_nota_manual(request):
                     continue
 
                 item_data = item_form.cleaned_data
+                # Pula itens vazios (formset extra forms)
+                if not item_data.get("descricao"):
+                    continue
                 item_nota = ItemNota(
                     nota=nota,
                     codigo_fornecedor=item_data.get("codigo_fornecedor", ""),
-                    descricao=item_data["descricao"],
+                    descricao=item_data.get("descricao", ""),
                     unidade=item_data.get("unidade", "UN"),
-                    quantidade=item_data["quantidade"],
-                    valor_unitario=item_data["valor_unitario"],
-                    valor_total=item_data["valor_total"],
+                    quantidade=item_data.get("quantidade", Decimal("0")),
+                    valor_unitario=item_data.get("valor_unitario", Decimal("0")),
+                    valor_total=item_data.get("valor_total", Decimal("0")),
                 )
 
                 # Tenta casar com item do contrato

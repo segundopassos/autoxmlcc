@@ -1,10 +1,12 @@
 """
 Views do app contratos — Etapa E1.
 Painel de contratos, CRUD de empresas e contratos.
+CA20: Paginação para suportar 1.000+ contratos com desempenho.
 """
 from datetime import timedelta
 
 from django.contrib import messages
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q, Sum, DecimalField
 from django.db.models.functions import Coalesce
 from django.shortcuts import render, get_object_or_404, redirect
@@ -67,12 +69,33 @@ def painel_contratos(request):
         "vencidos": Contrato.objects.filter(fim_vigencia__lt=hoje).count(),
     }
 
+    # Lista de abas para o template (contagens embutidas para evitar acesso dinâmico a dict no DTL)
+    abas = [
+        {"key": "geral", "label": "Geral", "count": contagens["geral"]},
+        {"key": "ativos", "label": "Ativos", "count": contagens["ativos"]},
+        {"key": "a_vencer", "label": "A vencer em 30 dias", "count": contagens["a_vencer"]},
+        {"key": "vencidos", "label": "Vencidos", "count": contagens["vencidos"]},
+    ]
+
+    # CA20: Paginação para suportar 1.000+ contratos com desempenho < 2s
+    paginator = Paginator(queryset, 50)  # 50 contratos por página
+    page_number = request.GET.get("page")
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
     context = {
-        "contratos": queryset,
+        "contratos": page_obj,
+        "page_obj": page_obj,
+        "paginator": paginator,
         "aba": aba,
         "busca": busca,
         "ano": ano,
         "contagens": contagens,
+        "abas": abas,
     }
     return render(request, "contratos/painel.html", context)
 
@@ -139,21 +162,22 @@ def contrato_detail(request, pk):
     Tela do contrato com abas Itens, Notas e OF, Aditivos.
     Mostra totais e tabela de itens.
     """
+    from notas.models import NotaFiscal
+
     contrato = get_object_or_404(
         Contrato.objects.select_related("empresa"), pk=pk
     )
     itens = contrato.itens.prefetch_related("precos").order_by("numero_item")
+    notas = NotaFiscal.objects.filter(contrato=contrato).order_by("-data_emissao")
 
-    # Totais do contrato
-    total_contratado = sum(
-        item.quantidade_contratada * (item.precos.first().valor_unitario if item.precos.exists() else 0)
-        for item in itens
-    )
+    # Aba ativa via query param
+    aba = request.GET.get("aba", "itens")
 
     context = {
         "contrato": contrato,
         "itens": itens,
-        "total_contratado": total_contratado,
+        "notas": notas,
+        "aba": aba,
     }
     return render(request, "contratos/contrato_detail.html", context)
 

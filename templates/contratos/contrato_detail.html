@@ -46,11 +46,11 @@
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-4 border-t border-gray-100">
     <div>
       <span class="text-gray-500 text-xs uppercase tracking-wide">Valor global</span>
-      <p class="text-xl font-bold text-slate-800">R$ {{ total_contratado|floatformat:2 }}</p>
+      <p class="text-xl font-bold text-slate-800">R$ {{ contrato.total_contratado|floatformat:2 }}</p>
     </div>
     <div>
       <span class="text-gray-500 text-xs uppercase tracking-wide">Faturado</span>
-      <p class="text-xl font-bold text-blue-700">R$ 0,00</p>
+      <p class="text-xl font-bold text-blue-700">R$ {{ contrato.total_faturado|floatformat:2 }}</p>
     </div>
     <div>
       <span class="text-gray-500 text-xs uppercase tracking-wide">Reservado</span>
@@ -58,72 +58,160 @@
     </div>
     <div>
       <span class="text-gray-500 text-xs uppercase tracking-wide">Saldo</span>
-      <p class="text-xl font-bold text-green-700">R$ {{ total_contratado|floatformat:2 }}</p>
+      {% widthratio contrato.total_faturado contrato.total_contratado 100 as pct_consumido %}
+      <p class="text-xl font-bold {% if pct_consumido >= 100 %}text-red-700{% elif pct_consumido >= 80 %}text-yellow-700{% else %}text-green-700{% endif %}">
+        R$ {{ contrato.saldo_disponivel|floatformat:2 }}
+      </p>
+      <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+        <div class="h-1.5 rounded-full {% if pct_consumido >= 100 %}bg-red-500{% elif pct_consumido >= 80 %}bg-yellow-500{% else %}bg-green-500{% endif %}" style="width: {{ pct_consumido|default:0 }}%"></div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Abas -->
-<div class="flex space-x-1 mb-4 border-b border-gray-200">
-  <button class="px-4 py-2 text-sm font-medium rounded-t bg-white border border-b-0 border-gray-200 text-emerald-700 -mb-px">
-    Itens
-  </button>
-  <button class="px-4 py-2 text-sm font-medium rounded-t text-gray-500 hover:text-gray-700 cursor-not-allowed">
-    Notas e OF
-  </button>
-  <button class="px-4 py-2 text-sm font-medium rounded-t text-gray-500 hover:text-gray-700 cursor-not-allowed">
-    Aditivos
-  </button>
-</div>
+<!-- Abas funcionais -->
+<div x-data="{ aba: '{{ aba|default:"itens" }}' }" class="mb-6">
+  <div class="flex space-x-1 mb-4 border-b border-gray-200">
+    <button @click="aba = 'itens'" :class="aba === 'itens' ? 'bg-white border border-b-0 border-gray-200 text-emerald-700 -mb-px' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-2 text-sm font-medium rounded-t transition-colors">
+      Itens
+      <span class="ml-1 px-2 py-0.5 rounded-full text-xs" :class="aba === 'itens' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'">{{ itens|length }}</span>
+    </button>
+    <button @click="aba = 'notas'" :class="aba === 'notas' ? 'bg-white border border-b-0 border-gray-200 text-emerald-700 -mb-px' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-2 text-sm font-medium rounded-t transition-colors">
+      Notas e OF
+      <span class="ml-1 px-2 py-0.5 rounded-full text-xs" :class="aba === 'notas' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'">{{ notas|length }}</span>
+    </button>
+    <button @click="aba = 'aditivos'" :class="aba === 'aditivos' ? 'bg-white border border-b-0 border-gray-200 text-emerald-700 -mb-px' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-2 text-sm font-medium rounded-t transition-colors">
+      Aditivos
+    </button>
+  </div>
 
-<!-- Tabela de itens -->
-{% if itens %}
-<div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-  <div class="overflow-x-auto">
-    <table class="w-full text-left text-sm">
-      <thead class="bg-gray-50 border-b border-gray-200 sticky top-0">
-        <tr>
-          <th class="px-4 py-3 font-medium text-gray-600 w-16">Nº</th>
-          <th class="px-4 py-3 font-medium text-gray-600">Descrição</th>
-          <th class="px-4 py-3 font-medium text-gray-600 w-16">Unid.</th>
-          <th class="px-4 py-3 font-medium text-gray-600 text-right w-28">Contratado</th>
-          <th class="px-4 py-3 font-medium text-gray-600 text-right w-28">Preço un.</th>
-          <th class="px-4 py-3 font-medium text-gray-600 text-right w-32">Total</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-100">
-        {% for item in itens %}
-        {% with preco=item.precos.first %}
-        <tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 font-mono text-slate-600">{{ item.numero_item }}</td>
-          <td class="px-4 py-3 no-truncate">{{ item.descricao }}</td>
-          <td class="px-4 py-3 text-slate-600">{{ item.unidade }}</td>
-          <td class="px-4 py-3 text-right font-mono">{{ item.quantidade_contratada|floatformat:4 }}</td>
-          <td class="px-4 py-3 text-right font-mono">
-            {% if preco %}R$ {{ preco.valor_unitario|floatformat:4 }}{% else %}—{% endif %}
-          </td>
-          <td class="px-4 py-3 text-right font-mono">
-            {% if preco %}R$ {{ item.quantidade_contratada|floatformat:2 }}{% else %}—{% endif %}
-          </td>
-        </tr>
-        {% endwith %}
-        {% endfor %}
-      </tbody>
-    </table>
+  <!-- ABA ITENS -->
+  <div x-show="aba === 'itens'">
+    {% if itens %}
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div class="overflow-x-auto max-h-[600px]">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+            <tr>
+              <th class="px-4 py-3 font-medium text-gray-600 w-16">Nº</th>
+              <th class="px-4 py-3 font-medium text-gray-600">Descrição</th>
+              <th class="px-4 py-3 font-medium text-gray-600 w-16">Unid.</th>
+              <th class="px-4 py-3 font-medium text-gray-600 text-right w-24">Contratado</th>
+              <th class="px-4 py-3 font-medium text-gray-600 text-right w-24">Aditivo</th>
+              <th class="px-4 py-3 font-medium text-gray-600 text-right w-24">Faturado</th>
+              <th class="px-4 py-3 font-medium text-gray-600 text-right w-24">Saldo</th>
+              <th class="px-4 py-3 font-medium text-gray-600 text-right w-28">Preço un.</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for item in itens %}
+            {% with preco=item.precos.first %}
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 font-mono text-slate-600">{{ item.numero_item }}</td>
+              <td class="px-4 py-3 no-truncate">{{ item.descricao }}</td>
+              <td class="px-4 py-3 text-slate-600">{{ item.unidade }}</td>
+              <td class="px-4 py-3 text-right font-mono">{{ item.quantidade_contratada|floatformat:4 }}</td>
+              <td class="px-4 py-3 text-right font-mono">{% if item.qnt_aditivada %}+{{ item.qnt_aditivada|floatformat:4 }}{% else %}—{% endif %}</td>
+              <td class="px-4 py-3 text-right font-mono text-blue-700">{{ item.qnt_faturada|floatformat:4 }}</td>
+              <td class="px-4 py-3 text-right font-mono {% if item.saldo_restante < 0 %}text-red-600 font-bold{% elif item.saldo_restante == 0 %}text-yellow-600{% else %}text-green-700{% endif %}">
+                {{ item.saldo_restante|floatformat:4 }}
+              </td>
+              <td class="px-4 py-3 text-right font-mono">
+                {% if preco %}R$ {{ preco.valor_unitario|floatformat:4 }}{% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center py-12 bg-white border border-dashed border-gray-300 rounded-lg">
+      <p class="text-gray-500 mb-3">Este contrato ainda não tem itens.</p>
+      <a href="{% url 'importacao:importar' %}" class="inline-block px-6 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-medium">
+        Subir planilha
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ABA NOTAS E OF -->
+  <div x-show="aba === 'notas'" x-cloak>
+    {% if notas %}
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-4 py-3 font-medium text-gray-600">Número</th>
+            <th class="px-4 py-3 font-medium text-gray-600">Data</th>
+            <th class="px-4 py-3 font-medium text-gray-600 text-right">Valor</th>
+            <th class="px-4 py-3 font-medium text-gray-600">Status</th>
+            <th class="px-4 py-3 font-medium text-gray-600">OF</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for nota in notas %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 font-mono"><a href="{% url 'notas:nota_detail' nota.pk %}" class="text-emerald-700 hover:underline">{{ nota.numero }}</a></td>
+            <td class="px-4 py-3">{{ nota.data_emissao|date:"d/m/Y"|default:"—" }}</td>
+            <td class="px-4 py-3 text-right font-mono">R$ {{ nota.valor_total|floatformat:2 }}</td>
+            <td class="px-4 py-3">
+              {% if nota.status == "conferida" %}<span class="px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">Conferida</span>
+              {% elif nota.status == "liberada" %}<span class="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">Liberada</span>
+              {% elif nota.status == "bloqueada" %}<span class="px-2 py-0.5 rounded text-xs bg-red-100 text-red-800">Bloqueada</span>
+              {% else %}<span class="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">{{ nota.status }}</span>{% endif %}
+            </td>
+            <td class="px-4 py-3 text-slate-500">—</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-12 bg-white border border-dashed border-gray-300 rounded-lg">
+      <p class="text-gray-500 mb-3">Nenhuma nota fiscal lançada para este contrato.</p>
+      <a href="{% url 'importacao:upload_nota' %}" class="inline-block px-6 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-medium">
+        Lançar nota
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ABA ADITIVOS -->
+  <div x-show="aba === 'aditivos'" x-cloak>
+    <div class="text-center py-12 bg-white border border-dashed border-gray-300 rounded-lg">
+      <p class="text-gray-500 mb-3">Nenhum aditivo registrado.</p>
+      <p class="text-sm text-gray-400">Aditivos de quantidade, valor ou prazo aparecerão aqui.</p>
+    </div>
   </div>
 </div>
-{% else %}
-<div class="text-center py-12 bg-white border border-dashed border-gray-300 rounded-lg">
-  <p class="text-gray-500 mb-3">Este contrato ainda não tem itens.</p>
-  <p class="text-sm text-gray-400">Os itens serão adicionados na importação da planilha ou manualmente.</p>
-</div>
-{% endif %}
 
-<!-- Ações -->
-<div class="mt-6 flex gap-3">
-  <a href="{% url 'contratos:contrato_update' contrato.pk %}" class="px-6 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-medium">
-    Editar contrato
+<!-- Menu Opções + Ações -->
+<div class="mt-6 flex flex-wrap gap-3 items-center">
+  <a href="{% url 'importacao:upload_nota' %}?contrato_id={{ contrato.pk }}" class="px-6 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-medium">
+    Lançar nota
   </a>
+
+  <!-- Dropdown Opções -->
+  <div x-data="{ open: false }" class="relative">
+    <button @click="open = !open" @click.away="open = false" class="px-6 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 font-medium flex items-center gap-2">
+      Opções
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+    <div x-show="open" x-cloak class="absolute left-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+      <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Documentos</p>
+      <a href="{% url 'relatorios:relatorio_contrato_pdf' contrato.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Relatório de saldos (PDF)</a>
+      <a href="{% url 'relatorios:exportar_excel' contrato.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Exportar planilha (Excel)</a>
+      <div class="border-t border-gray-100 my-1"></div>
+      <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Planilha</p>
+      <a href="{% url 'importacao:importar' %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Subir / substituir planilha</a>
+      <div class="border-t border-gray-100 my-1"></div>
+      <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">Contrato</p>
+      <a href="{% url 'contratos:contrato_update' contrato.pk %}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Editar dados do contrato</a>
+    </div>
+  </div>
+
   <a href="{% url 'contratos:painel' %}" class="px-6 py-2 border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
     Voltar ao painel
   </a>

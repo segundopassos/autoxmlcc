@@ -11,10 +11,12 @@ class EmpresaForm(forms.ModelForm):
         fields = ["cnpj", "razao_social"]
         widgets = {
             "cnpj": forms.TextInput(attrs={
+                "class": "w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none",
                 "placeholder": "00.000.000/0000-00",
                 "maxlength": 18,
             }),
             "razao_social": forms.TextInput(attrs={
+                "class": "w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none",
                 "placeholder": "Razão social da empresa",
             }),
         }

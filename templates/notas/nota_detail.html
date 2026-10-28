@@ -117,6 +117,11 @@
       Liberar nota
     </a>
     {% endif %}
+    {% if nota.status == "conferida" or nota.status == "liberada" %}
+    <a href="{% url 'ordens:gerar_of_pdf' nota.pk %}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded font-medium transition">
+      Gerar OF
+    </a>
+    {% endif %}
     <a href="{% url 'contratos:painel' %}" class="border border-slate-300 text-slate-600 px-6 py-2 rounded hover:bg-slate-50 transition">
       Voltar ao painel
     </a>

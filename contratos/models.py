@@ -138,6 +138,31 @@ class Contrato(models.Model):
             return "a_vencer"
         return "ativo"
 
+    @property
+    def total_contratado(self) -> Decimal:
+        """Soma das quantidades contratadas × preço vigente de todos os itens."""
+        total = Decimal("0")
+        for item in self.itens.all():
+            preco = item.precos.order_by("-vigente_a_partir_de").first()
+            if preco:
+                total += item.quantidade_contratada * preco.valor_unitario
+        return total
+
+    @property
+    def total_faturado(self) -> Decimal:
+        """Soma dos valores faturados (qnt_faturada × preço vigente) de todos os itens."""
+        total = Decimal("0")
+        for item in self.itens.all():
+            preco = item.precos.order_by("-vigente_a_partir_de").first()
+            if preco:
+                total += item.qnt_faturada * preco.valor_unitario
+        return total
+
+    @property
+    def saldo_disponivel(self) -> Decimal:
+        """Valor global menos o total faturado (RN07: saldo calculado)."""
+        return self.total_contratado - self.total_faturado
+
 
 class ItemContrato(models.Model):
     """
@@ -164,6 +189,30 @@ class ItemContrato(models.Model):
     quantidade_contratada = models.DecimalField(
         max_digits=14, decimal_places=4, verbose_name="Quantidade contratada",
     )
+    qnt_aditivada = models.DecimalField(
+        max_digits=14, decimal_places=4, default=Decimal("0"),
+        verbose_name="Quantidade aditivada",
+    )
+    qnt_faturada_base = models.DecimalField(
+        max_digits=14, decimal_places=4, default=Decimal("0"),
+        verbose_name="Quantidade faturada base (planilha inicial)",
+        help_text="Faturado que já veio na planilha inicial de importação.",
+    )
+    qnt_faturada = models.DecimalField(
+        max_digits=14, decimal_places=4, default=Decimal("0"),
+        verbose_name="Quantidade faturada total",
+        help_text="Soma de qnt_faturada_base + lançamentos de NF.",
+    )
+    nota_que_esgotou = models.CharField(
+        max_length=100, blank=True, null=True,
+        verbose_name="Nota que esgotou o saldo",
+        help_text="Ex: 'PLANILHA INICIAL', 'NF 3432'.",
+    )
+    ultimo_hash_planilha = models.CharField(
+        max_length=64, blank=True, null=True,
+        verbose_name="Último hash SHA-256 da planilha",
+        help_text="Evita duplicar planilha no modo somar.",
+    )
     origem = models.CharField(
         max_length=10, choices=ORIGEM_CHOICES, default="original",
     )
@@ -187,6 +236,12 @@ class ItemContrato(models.Model):
 
     def __str__(self):
         return f"Item {self.numero_item} — {self.descricao[:50]}"
+
+    @property
+    def saldo_restante(self) -> Decimal:
+        """Saldo disponível do item (RN07: calculado, nunca armazenado)."""
+        limite = self.quantidade_contratada + self.qnt_aditivada
+        return limite - self.qnt_faturada
 
     def save(self, *args, **kwargs):
         # Gera descrição normalizada automaticamente
@@ -247,3 +302,44 @@ def normalizar_descricao(texto: str) -> str:
     # Colapsa espaços
     texto = re.sub(r"\s+", " ", texto).strip()
     return texto
+
+
+def recalcular_saldos_contrato(contrato_id: int) -> None:
+    """
+    Recalcula saldos de todos os itens de um contrato dentro de transação atômica.
+    Etapa 1.2 do Plano Mestre: determina cronologicamente qual NF esgotou/estourou o saldo.
+    """
+    from django.db import transaction
+    from notas.models import ItemNota, NotaFiscal
+
+    with transaction.atomic():
+        itens = ItemContrato.objects.filter(contrato_id=contrato_id).select_for_update()
+        for item in itens:
+            limite = round(float(item.quantidade_contratada or 0) + float(item.qnt_aditivada or 0), 4)
+            acumulado = round(float(item.qnt_faturada_base or 0), 4)
+            nota_esgotou = None
+
+            if limite > 0 and acumulado >= limite:
+                nota_esgotou = "PLANILHA INICIAL"
+
+            lancamentos = (
+                ItemNota.objects.filter(item_contrato=item)
+                .exclude(nota__status="bloqueada")
+                .select_related("nota")
+                .order_by("nota__data_emissao", "nota__id")
+            )
+
+            for lanc in lancamentos:
+                antes = acumulado
+                qtd_l = round(float(lanc.quantidade or 0), 4)
+                acumulado = round(acumulado + qtd_l, 4)
+
+                if nota_esgotou is None and limite > 0:
+                    if antes < limite and acumulado >= limite:
+                        nota_esgotou = f"NF {lanc.nota.numero}"
+                    elif acumulado > limite:
+                        nota_esgotou = f"NF {lanc.nota.numero}"
+
+            item.qnt_faturada = Decimal(str(acumulado))
+            item.nota_que_esgotou = nota_esgotou
+            item.save(update_fields=["qnt_faturada", "nota_que_esgotou", "atualizado_em"])

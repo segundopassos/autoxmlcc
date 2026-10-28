@@ -42,11 +42,17 @@ def registrar_auditoria_nota(sender, instance, created, **kwargs):
     """RN20: Registra criação, edição ou liberação de nota fiscal."""
     from .models import RegistroAuditoria
 
-    acao = "criacao" if created else "edicao"
-    if instance.status == "liberada" and not created:
+    # Determina a ação com base no estado atual e se é novo
+    if created:
+        acao = "criacao"
+    elif instance.status == "liberada":
+        # Verifica se já existe um registro de liberação recente para evitar duplicidade
+        # mas para fins de auditoria simples, registramos sempre que salvar como liberada
         acao = "liberacao"
-    elif instance.status == "bloqueada" and not created:
+    elif instance.status == "bloqueada":
         acao = "bloqueio"
+    else:
+        acao = "edicao"
 
     RegistroAuditoria.objects.create(
         usuario=None,  # Usuário será preenchido via middleware em produção
@@ -55,7 +61,7 @@ def registrar_auditoria_nota(sender, instance, created, **kwargs):
         objeto_id=instance.pk,
         objeto_repr=str(instance),
         valores_depois=_serializar_valores(instance),
-        justificativa=instance.justificativa_liberacao if acao == "liberacao" else "",
+        justificativa=getattr(instance, 'justificativa_liberacao', "") if acao == "liberacao" else "",
     )
 
 
