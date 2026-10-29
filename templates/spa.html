@@ -554,32 +554,72 @@
                 d.innerHTML = '<div class="col-span-full bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-xs">Nenhum contrato encontrado para este filtro.</div>';
                 return;
             }
-            let htmlBatch = '';
-            for (let i = 0; i < lista.length; i++) {
-                const c = lista[i];
-                const isVenc = c.status === 'VENCIDO';
-                const badgeStatus = isVenc
-                    ? '<span class="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-md">VENCIDO</span>'
-                    : '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">ATIVO</span>';
 
-                htmlBatch += `<div class="contrato-card bg-white border ${isVenc ? 'border-red-200' : 'border-slate-200'} rounded-2xl p-4 cursor-pointer hover:border-indigo-500 hover:shadow-md transition flex flex-col justify-between" onclick="abrir(${c.id})">
-                    <div>
+            // Agrupa por empresa (estilo pastas)
+            const grupos = {};
+            lista.forEach(c => {
+                const chave = c.nome_empresa || 'Sem Empresa';
+                if (!grupos[chave]) grupos[chave] = [];
+                grupos[chave].push(c);
+            });
+
+            // Ordena empresas alfabeticamente
+            const empresasOrdenadas = Object.keys(grupos).sort((a, b) => a.localeCompare(b));
+
+            let htmlBatch = '';
+            empresasOrdenadas.forEach(nomeEmpresa => {
+                const contratosEmpresa = grupos[nomeEmpresa];
+                const idGrupo = 'grupo_' + nomeEmpresa.replace(/[^a-zA-Z0-9]/g, '_');
+                const qtdAtivos = contratosEmpresa.filter(c => c.status !== 'VENCIDO').length;
+                const qtdVencidos = contratosEmpresa.filter(c => c.status === 'VENCIDO').length;
+
+                htmlBatch += `<div class="col-span-full mb-4">
+                    <div class="flex items-center gap-3 mb-3 cursor-pointer group" onclick="toggleGrupo('${idGrupo}')">
+                        <i class="fa-solid fa-folder${contratosEmpresa.length > 0 ? '-open' : ''} text-amber-500 text-lg group-hover:text-amber-600 transition"></i>
+                        <h3 class="text-sm font-bold text-slate-800 group-hover:text-indigo-700 transition">${nomeEmpresa}</h3>
+                        <span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">${contratosEmpresa.length} contrato${contratosEmpresa.length > 1 ? 's' : ''}</span>
+                        ${qtdAtivos > 0 ? `<span class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">${qtdAtivos} ativo${qtdAtivos > 1 ? 's' : ''}</span>` : ''}
+                        ${qtdVencidos > 0 ? `<span class="text-[10px] font-bold bg-red-50 text-red-700 px-2 py-0.5 rounded-full">${qtdVencidos} vencido${qtdVencidos > 1 ? 's' : ''}</span>` : ''}
+                        <i class="fa-solid fa-chevron-down text-slate-400 text-xs ml-auto transition transform" id="chevron_${idGrupo}"></i>
+                    </div>
+                    <div id="${idGrupo}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 ml-6 border-l-2 border-amber-200 pl-4">`;
+
+                contratosEmpresa.forEach(c => {
+                    const isVenc = c.status === 'VENCIDO';
+                    const badgeStatus = isVenc
+                        ? '<span class="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-md">VENCIDO</span>'
+                        : '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">ATIVO</span>';
+
+                    htmlBatch += `<div class="contrato-card bg-white border ${isVenc ? 'border-red-200' : 'border-slate-200'} rounded-xl p-3 cursor-pointer hover:border-indigo-500 hover:shadow-md transition" onclick="abrir(${c.id})">
                         <div class="flex items-center justify-between gap-2 mb-2">
-                            <span class="text-xs font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg">Contrato Nº ${c.numero_contrato}</span>
+                            <span class="text-[11px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg truncate max-w-[70%]" title="Contrato Nº ${c.numero_contrato}">${c.numero_contrato}</span>
                             ${badgeStatus}
                         </div>
-                        <h4 class="font-bold text-slate-800 text-xs leading-snug break-words mb-2">${c.nome_empresa}</h4>
-                    </div>
-                    <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
-                        <div class="font-mono text-slate-600">CNPJ: ${formatarCNPJ(c.cnpj)}</div>
-                        <div class="flex justify-between items-center">
-                            <span>Venc: <strong>${formatarDataBR(c.data_fim)}</strong></span>
-                            <span class="font-bold ${c.total_itens > 0 ? 'text-indigo-600' : 'text-slate-400'}">${c.total_itens} itens</span>
+                        <div class="text-[11px] text-slate-500 space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span>Venc: <strong class="text-slate-700">${formatarDataBR(c.data_fim)}</strong></span>
+                                <span class="font-bold ${c.total_itens > 0 ? 'text-indigo-600' : 'text-slate-400'}">${c.total_itens} itens</span>
+                            </div>
                         </div>
-                    </div>
-                </div>`;
-            }
+                    </div>`;
+                });
+
+                htmlBatch += `</div></div>`;
+            });
+
             d.innerHTML = htmlBatch;
+        }
+
+        function toggleGrupo(idGrupo) {
+            const el = document.getElementById(idGrupo);
+            const chevron = document.getElementById('chevron_' + idGrupo);
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                chevron.classList.remove('rotate-[-90deg]');
+            } else {
+                el.classList.add('hidden');
+                chevron.classList.add('rotate-[-90deg]');
+            }
         }
 
         async function abrir(id) {

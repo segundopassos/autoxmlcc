@@ -105,6 +105,10 @@ class Contrato(models.Model):
     )
     inicio_vigencia = models.DateField(verbose_name="Início da vigência")
     fim_vigencia = models.DateField(verbose_name="Fim da vigência")
+    status_tce = models.CharField(
+        max_length=50, blank=True, verbose_name="Status TCE",
+        help_text="Status conforme planilha mestra do TCE (ex: Em vigência)",
+    )
     fiscal = models.CharField(max_length=255, blank=True, verbose_name="Fiscal do contrato")
     solicitante = models.CharField(max_length=255, blank=True)
     ordenador = models.CharField(max_length=255, blank=True)

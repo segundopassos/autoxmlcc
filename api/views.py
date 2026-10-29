@@ -235,6 +235,14 @@ def lista_contratos(request):
             qnt_faturada__gte=models.F('quantidade_contratada') + models.F('qnt_aditivada')
         ).count() if total_itens > 0 else 0
 
+        # Usa status_tce se disponível (fonte oficial TCE), senão calcula pela data
+        if c.status_tce and "vig" in c.status_tce.lower():
+            status_display = "ATIVO"
+        elif c.status_tce and ("encerr" in c.status_tce.lower() or "finaliz" in c.status_tce.lower()):
+            status_display = "VENCIDO"
+        else:
+            status_display = c.situacao.upper()
+
         resultado.append({
             "id": c.id,
             "nome_empresa": c.empresa.razao_social,
@@ -242,7 +250,7 @@ def lista_contratos(request):
             "numero_contrato": c.numero,
             "data_inicio": c.inicio_vigencia.isoformat() if c.inicio_vigencia else None,
             "data_fim": c.fim_vigencia.isoformat() if c.fim_vigencia else None,
-            "status": c.situacao.upper(),
+            "status": status_display,
             "total_itens": total_itens,
             "total_notas": total_notas,
             "itens_esgotados": itens_esgotados,
@@ -1092,6 +1100,8 @@ def importar_lista_mestra(request):
                 continue
             if "numero" in norm and "contrato" in norm:
                 mapeamento["numero"] = idx
+            elif "nome" in norm and "empresa" in norm:
+                mapeamento["nome_empresa"] = idx
             elif norm == "cnpj":
                 mapeamento["cnpj"] = idx
             elif "status" in norm:
@@ -1099,14 +1109,17 @@ def importar_lista_mestra(request):
             elif "data" in norm and "assinatura" in norm:
                 mapeamento["data_assinatura"] = idx
             elif "inicio" in norm and "vigencia" in norm:
-                mapeamento["inicio_vigencia"] = idx
+                # Prioriza "Atual" sobre "Inicial"
+                if "inicio_vigencia" not in mapeamento or "atual" in norm:
+                    mapeamento["inicio_vigencia"] = idx
             elif "fim" in norm and "vigencia" in norm:
-                mapeamento["fim_vigencia"] = idx
+                if "fim_vigencia" not in mapeamento or "atual" in norm:
+                    mapeamento["fim_vigencia"] = idx
             elif "processo" in norm:
                 mapeamento["processo_tce"] = idx
             elif "modalidade" in norm:
                 mapeamento["modalidade"] = idx
-            elif norm == "tipo":
+            elif "tipo" in norm:
                 mapeamento["tipo"] = idx
             elif "objeto" in norm:
                 mapeamento["objeto"] = idx
@@ -1142,6 +1155,9 @@ def importar_lista_mestra(request):
                 if not numero or not cnpj:
                     continue
 
+                # Limpa prefixo "Termo de contrato" do número
+                numero_limpo = re.sub(r"^termo\s+de\s+contrato\s+", "", numero, flags=re.IGNORECASE).strip()
+
                 # Limpa CNPJ
                 cnpj_limpo = re.sub(r"[^\d]", "", cnpj)
                 if len(cnpj_limpo) != 14:
@@ -1151,17 +1167,23 @@ def importar_lista_mestra(request):
                 # Formata CNPJ para padrão XX.XXX.XXX/XXXX-XX
                 cnpj_fmt = f"{cnpj_limpo[:2]}.{cnpj_limpo[2:5]}.{cnpj_limpo[5:8]}/{cnpj_limpo[8:12]}-{cnpj_limpo[12:]}"
 
-                # Busca objeto/razão social
+                # Busca nome da empresa (prioridade) ou objeto como fallback
+                nome_empresa = pegar("nome_empresa") or ""
                 objeto = pegar("objeto") or ""
+                razao = nome_empresa if nome_empresa else (objeto[:200] if objeto else f"Empresa {cnpj_fmt}")
 
-                # Cria ou atualiza empresa
+                # Cria ou atualiza empresa — sempre atualiza o nome se veio da planilha mestra
                 empresa, criado_emp = Empresa.objects.get_or_create(
                     cnpj=cnpj_fmt,
-                    defaults={"razao_social": objeto[:200] if objeto else f"Empresa {cnpj_fmt}"}
+                    defaults={"razao_social": razao}
                 )
                 if criado_emp:
                     criados_empresas += 1
                 else:
+                    # Atualiza o nome se a planilha trouxe um nome melhor
+                    if nome_empresa and empresa.razao_social != nome_empresa:
+                        empresa.razao_social = nome_empresa
+                        empresa.save()
                     atualizados_empresas += 1
 
                 # Parse datas
@@ -1186,15 +1208,23 @@ def importar_lista_mestra(request):
                 inicio_vig = parse_data(inicio_raw)
                 fim_vig = parse_data(fim_raw)
 
-                # Cria ou atualiza contrato
+                # Status da planilha TCE
+                status_planilha = pegar("status") or ""
+
+                # Cria ou atualiza contrato (usa numero_limpo sem o prefixo "Termo de contrato")
                 contrato, criado_ct = Contrato.objects.update_or_create(
-                    numero=numero,
+                    numero=numero_limpo,
                     empresa=empresa,
                     defaults={
                         "inicio_vigencia": inicio_vig,
                         "fim_vigencia": fim_vig,
+                        "status_tce": status_planilha,
                     }
                 )
+                # Se já existia, atualiza o status_tce também
+                if not criado_ct and status_planilha:
+                    contrato.status_tce = status_planilha
+                    contrato.save(update_fields=["status_tce"])
                 if criado_ct:
                     criados_contratos += 1
                 else:
