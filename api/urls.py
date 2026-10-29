@@ -46,4 +46,7 @@ urlpatterns = [
     # Relatórios PDF
     path("pdf/relatorio_contrato", views.pdf_relatorio_contrato, name="pdf_relatorio_contrato"),
     path("pdf/of_lote", views.pdf_of_lote, name="pdf_of_lote"),
+
+    # Exportação
+    path("exportar_xls", views.exportar_xls, name="exportar_xls"),
 ]

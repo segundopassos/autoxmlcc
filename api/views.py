@@ -309,10 +309,19 @@ def detalhe_contrato(request, contrato_id):
             "valor_total_faturado_real": round4(fat_notas),
         })
 
-    # Notas fiscais
-    notas_raw = contrato.notas.all()
+    # Notas fiscais com itens detalhados
+    notas_raw = contrato.notas.all().order_by('-data_emissao', '-id')
     notas = []
     for n in notas_raw:
+        itens_nota = []
+        for it_n in n.itens.select_related('item_contrato').all():
+            itens_nota.append({
+                "descricao": it_n.descricao,
+                "quantidade": float(it_n.quantidade),
+                "valor_unitario": float(it_n.valor_unitario),
+                "valor_total": float(it_n.valor_total),
+                "item_num": it_n.item_contrato.numero_item if it_n.item_contrato else None,
+            })
         notas.append({
             "id": n.id,
             "numero_nf": n.numero,
@@ -320,6 +329,8 @@ def detalhe_contrato(request, contrato_id):
             "data_emissao": n.data_emissao.isoformat() if n.data_emissao else None,
             "valor_total": float(n.valor_total),
             "status": n.status,
+            "origem": n.origem,
+            "itens": itens_nota,
         })
 
     return json_response({
@@ -908,6 +919,8 @@ def processar_xml_individual(conteudo, contexto_id=None):
             "data_emissao": data_emissao,
             "chave_acesso": chave,
             "emitente": razao_emit,
+            "cnpj_emitente": cnpj_emit,
+            "empresa_nome": contrato.empresa.razao_social,
             "valor_total": vNF,
             "itens": itens_conciliados,
             "itens_contrato_disponiveis": itens_contrato,
@@ -990,6 +1003,26 @@ def gravar_nota_individual(nota_data):
                 )
 
             recalcular_saldos_contrato(contrato_id)
+
+            # Cria Ordem de Fornecimento automaticamente (RN16: data = 1º dia útil do mês)
+            from datetime import date as dt_date
+            data_emi = nota.data_emissao or timezone.now().date()
+            if isinstance(data_emi, str):
+                try:
+                    data_emi = datetime.fromisoformat(data_emi).date()
+                except Exception:
+                    data_emi = timezone.now().date()
+            data_assinatura_of = primeiro_dia_util(data_emi.year, data_emi.month)
+            ano_of = data_emi.year
+            OrdemFornecimento.objects.get_or_create(
+                nota=nota,
+                defaults={
+                    "ano": ano_of,
+                    "data_assinatura": data_assinatura_of,
+                    "status": "emitida",
+                    "numero": "",
+                },
+            )
 
         return {"ok": True, "nota_id": nota.id}
 
@@ -1600,8 +1633,25 @@ def pdf_of_lote(request):
             nota = get_object_or_404(NotaFiscal.objects.select_related('contrato__empresa'), pk=nf_id)
             of = OrdemFornecimento.objects.filter(nota=nota).first()
 
+            # Cria OF automaticamente se não existir (RN16)
             if not of:
-                continue
+                from datetime import date as dt_date
+                data_emi = nota.data_emissao or timezone.now().date()
+                if isinstance(data_emi, str):
+                    try:
+                        data_emi = datetime.fromisoformat(data_emi).date()
+                    except Exception:
+                        data_emi = timezone.now().date()
+                data_assinatura_of = primeiro_dia_util(data_emi.year, data_emi.month)
+                of, _ = OrdemFornecimento.objects.get_or_create(
+                    nota=nota,
+                    defaults={
+                        "ano": data_emi.year,
+                        "data_assinatura": data_assinatura_of,
+                        "status": "emitida",
+                        "numero": "",
+                    },
+                )
 
             itens_html = ""
             sum_total = 0.0
@@ -1766,3 +1816,140 @@ def transferir_itens(request, contrato_id):
         return error_response("JSON inválido.")
     except Exception as e:
         return error_response(f"Erro ao adaptar itens: {str(e)}", 500)
+
+
+# ============================================================================
+# EXPORTAÇÃO XLS
+# ============================================================================
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def exportar_xls(request):
+    """Exporta planilha de saldos do contrato em formato XLS (openpyxl)."""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+        from openpyxl.utils import get_column_letter
+
+        contrato_id = request.GET.get('contrato_id')
+        if not contrato_id:
+            return error_response("contrato_id é obrigatório.")
+
+        contrato = get_object_or_404(Contrato.objects.select_related('empresa'), pk=contrato_id)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Saldos"
+
+        # Estilos
+        header_font = Font(bold=True, size=11, color="FFFFFF")
+        header_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
+        header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+        num_fmt_qtd = '#,##0.0000'
+        num_fmt_val = '#,##0.00'
+
+        # Cabeçalho do contrato
+        ws.merge_cells('A1:H1')
+        ws['A1'] = f"Contrato Nº {contrato.numero} — {contrato.empresa.razao_social}"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A2:H2')
+        ws['A2'] = f"CNPJ: {formatar_cnpj(contrato.empresa.cnpj)} | Vigência: {contrato.inicio_vigencia.strftime('%d/%m/%Y') if contrato.inicio_vigencia else '-'} a {contrato.fim_vigencia.strftime('%d/%m/%Y') if contrato.fim_vigencia else '-'}"
+        ws['A2'].font = Font(size=10, color="555555")
+
+        # Cabeçalhos da tabela
+        headers = ["Nº Item", "Lote", "Descrição", "Unidade", "Qtd Contratada", "Qtd Aditivada", "Qtd Faturada", "Saldo Disponível", "Valor Unitário", "Valor Contratado", "Valor Faturado", "Valor Disponível"]
+        for col_idx, h in enumerate(headers, 1):
+            cell = ws.cell(row=4, column=col_idx, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            cell.border = thin_border
+
+        # Dados dos itens
+        row = 5
+        total_contratado = Decimal("0")
+        total_faturado = Decimal("0")
+
+        for it in contrato.itens.order_by('numero_item').prefetch_related('precos'):
+            preco = it.precos.order_by("-vigente_a_partir_de").first()
+            val_unitario = preco.valor_unitario if preco else Decimal("0")
+            qtd_total = it.quantidade_contratada + it.qnt_aditivada
+            saldo = qtd_total - it.qnt_faturada
+            val_contratado = qtd_total * val_unitario
+            val_faturado_real = Decimal(str(round(float(it.qnt_faturada) * float(val_unitario), 2)))
+            val_disponivel = val_contratado - val_faturado_real
+
+            total_contratado += val_contratado
+            total_faturado += val_faturado_real
+
+            valores = [
+                it.numero_item,
+                it.lote or "",
+                it.descricao,
+                it.unidade,
+                float(qtd_total),
+                float(it.qnt_aditivada),
+                float(it.qnt_faturada),
+                float(saldo),
+                float(val_unitario),
+                float(val_contratado),
+                float(val_faturado_real),
+                float(val_disponivel),
+            ]
+            for col_idx, v in enumerate(valores, 1):
+                cell = ws.cell(row=row, column=col_idx, value=v)
+                cell.border = thin_border
+                if col_idx >= 5 and col_idx <= 8:
+                    cell.number_format = num_fmt_qtd
+                elif col_idx >= 9:
+                    cell.number_format = num_fmt_val
+                if col_idx == 8 and isinstance(v, (int, float)) and v < 0:
+                    cell.font = Font(color="FF0000", bold=True)
+            row += 1
+
+        # Linha de totais
+        total_fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=8)
+        cell_total = ws.cell(row=row, column=1, value="TOTAIS")
+        cell_total.font = Font(bold=True, size=11)
+        cell_total.fill = total_fill
+        cell_total.alignment = Alignment(horizontal="right")
+        cell_total.border = thin_border
+        for c in range(2, 9):
+            ws.cell(row=row, column=c).fill = total_fill
+            ws.cell(row=row, column=c).border = thin_border
+
+        ws.cell(row=row, column=9, value="").border = thin_border
+        ws.cell(row=row, column=9).fill = total_fill
+        ws.cell(row=row, column=10, value=float(total_contratado)).border = thin_border
+        ws.cell(row=row, column=10).number_format = num_fmt_val
+        ws.cell(row=row, column=10).font = Font(bold=True)
+        ws.cell(row=row, column=10).fill = total_fill
+        ws.cell(row=row, column=11, value=float(total_faturado)).border = thin_border
+        ws.cell(row=row, column=11).number_format = num_fmt_val
+        ws.cell(row=row, column=11).font = Font(bold=True)
+        ws.cell(row=row, column=11).fill = total_fill
+        ws.cell(row=row, column=12, value=float(total_contratado - total_faturado)).border = thin_border
+        ws.cell(row=row, column=12).number_format = num_fmt_val
+        ws.cell(row=row, column=12).font = Font(bold=True)
+        ws.cell(row=row, column=12).fill = total_fill
+
+        # Ajusta largura das colunas
+        larguras = [8, 8, 45, 8, 14, 14, 14, 14, 12, 14, 14, 14]
+        for i, w in enumerate(larguras, 1):
+            ws.column_dimensions[get_column_letter(i)].width = w
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        nome_arquivo = f"Saldos_{contrato.numero.replace('/', '-').replace('.', '_')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+        wb.save(response)
+        return response
+
+    except ImportError:
+        return error_response("Biblioteca openpyxl não instalada.", 500)
+    except Exception as e:
+        return error_response(f"Erro ao gerar XLS: {str(e)}", 500)

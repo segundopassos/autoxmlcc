@@ -137,6 +137,10 @@
                                     <i class="fa-solid fa-print text-slate-500 w-4"></i>
                                     <span class="font-medium text-slate-700">Relatório de Saldos (PDF)</span>
                                 </button>
+                                <button onclick="exportarPlanilhaXLS()" class="w-full px-4 py-2.5 text-left text-xs hover:bg-slate-50 flex items-center gap-3 transition">
+                                    <i class="fa-solid fa-file-excel text-emerald-600 w-4"></i>
+                                    <span class="font-medium text-slate-700">Exportar Planilha (XLS)</span>
+                                </button>
                                 <button onclick="abrirGavetaNotas()" class="w-full px-4 py-2.5 text-left text-xs hover:bg-slate-50 flex items-center gap-3 transition">
                                     <i class="fa-solid fa-file-lines text-indigo-500 w-4"></i>
                                     <span class="font-medium text-slate-700">Emitir Ordens de Fornecimento</span>
@@ -1181,20 +1185,51 @@
             }
             let html = '';
             notas.forEach((n, idx) => {
+                const qtdItens = (n.itens && n.itens.length) || 0;
+                let itensHtml = '';
+                if (qtdItens > 0) {
+                    itensHtml = `<div class="mt-2 pl-7 hidden" id="itensNota_${n.id}"><table class="w-full text-[10px] text-slate-600 border-collapse"><thead><tr class="bg-slate-50"><th class="text-left p-1 border-b">Descrição</th><th class="text-right p-1 border-b w-12">Qtd</th><th class="text-right p-1 border-b w-16">Unit.</th><th class="text-right p-1 border-b w-16">Total</th></tr></thead><tbody>`;
+                    n.itens.forEach(it => {
+                        itensHtml += `<tr class="border-b border-slate-50"><td class="p-1">${it.descricao || '-'}</td><td class="p-1 text-right">${formatIntQtd(it.quantidade)}</td><td class="p-1 text-right">R$ ${formatBR(it.valor_unitario)}</td><td class="p-1 text-right font-medium">R$ ${formatBR(it.valor_total)}</td></tr>`;
+                    });
+                    itensHtml += '</tbody></table></div>';
+                }
+                const btnToggle = qtdItens > 0 ? `<button onclick="toggleItensNota(${n.id})" class="text-indigo-500 hover:text-indigo-700 text-[10px] font-medium ml-1 flex-shrink-0" title="Ver itens"><i class="fa-solid fa-chevron-down text-[9px]" id="setaItens_${n.id}"></i> ${qtdItens} ite${qtdItens === 1 ? 'm' : 'ns'}</button>` : '';
                 html += `
-                    <div class="border rounded-xl p-3 bg-white hover:bg-slate-50 flex items-center gap-3 text-xs transition nota-row" data-nota-id="${n.id}">
-                        <input type="checkbox" class="chkNota w-4 h-4 text-indigo-600 rounded flex-shrink-0" value="${n.id}" onchange="atualizarContadorSelecionadas()">
-                        <div class="flex-1 min-w-0">
-                            <div class="font-bold text-slate-800 truncate">NF-e Nº ${n.numero_nf}</div>
-                            <div class="text-slate-400 text-[10px]">Emitida: ${formatarDataBR(n.data_emissao)} &bull; R$ ${formatBR(n.valor_total)}</div>
+                    <div class="border rounded-xl p-3 bg-white hover:bg-slate-50 text-xs transition nota-row" data-nota-id="${n.id}">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" class="chkNota w-4 h-4 text-indigo-600 rounded flex-shrink-0" value="${n.id}" onchange="atualizarContadorSelecionadas()">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-bold text-slate-800">NF-e Nº ${n.numero_nf} ${n.serie ? '(Série ' + n.serie + ')' : ''}</div>
+                                <div class="text-slate-400 text-[10px] flex items-center gap-2 flex-wrap">
+                                    <span>Emissão: ${formatarDataBR(n.data_emissao)}</span>
+                                    <span>&bull;</span>
+                                    <span class="font-semibold text-slate-600">R$ ${formatBR(n.valor_total)}</span>
+                                    ${btnToggle}
+                                </div>
+                            </div>
+                            <button onclick="removerNotaFiscal(${n.id}, '${n.numero_nf}')" class="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 flex-shrink-0" title="Excluir nota e devolver saldo">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
                         </div>
-                        <button onclick="removerNotaFiscal(${n.id}, '${n.numero_nf}')" class="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 flex-shrink-0" title="Excluir nota e devolver saldo">
-                            <i class="fa-solid fa-trash-can text-xs"></i>
-                        </button>
+                        ${itensHtml}
                     </div>
                 `;
             });
             container.innerHTML = html;
+        }
+
+        function toggleItensNota(notaId) {
+            const el = document.getElementById('itensNota_' + notaId);
+            const seta = document.getElementById('setaItens_' + notaId);
+            if (!el) return;
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                if (seta) { seta.classList.remove('fa-chevron-down'); seta.classList.add('fa-chevron-up'); }
+            } else {
+                el.classList.add('hidden');
+                if (seta) { seta.classList.remove('fa-chevron-up'); seta.classList.add('fa-chevron-down'); }
+            }
         }
 
         function atualizarContadorSelecionadas() {
@@ -1294,6 +1329,12 @@
             const url = `/api/pdf/relatorio_contrato?contrato_id=${atual.id}&incluir_esgotados=${incluirEsgotados}&incluir_aditivo=${incluirAditivo}&detalhe_financeiro=${detalheFinanceiro}&totalizador=${totalizador}`;
             window.open(url, '_blank');
             fecharModalRelatorioPDF();
+        }
+
+        function exportarPlanilhaXLS() {
+            if (!atual) return;
+            document.getElementById('menuOpcoes').classList.add('hidden');
+            window.open(`/api/exportar_xls?contrato_id=${atual.id}`, '_blank');
         }
 
         async function limparItensContrato() {
@@ -1543,7 +1584,27 @@
 
         function exibirResultadoConferenciaNotas(d) {
             xmlsProcessados = d.notas || [];
-            if (d.erros && d.erros.length > 0) document.getElementById('xmlErrosGerais').innerText = 'Atenção: ' + d.erros.join(' | ');
+            let avisos = [];
+            if (d.erros && d.erros.length > 0) avisos = avisos.concat(d.erros);
+
+            // Verifica mismatch entre XML e contrato aberto
+            if (atual && atual.cnpj && xmlsProcessados.length > 0) {
+                const cnpjContrato = atual.cnpj.replace(/\D/g, '');
+                xmlsProcessados.forEach(n => {
+                    const cnpjNota = (n.cnpj_emitente || '').replace(/\D/g, '');
+                    if (cnpjNota && cnpjNota !== cnpjContrato) {
+                        const empresaSugestao = n.empresa_nome || n.emitente_nome || 'empresa desconhecida';
+                        avisos.push(`⚠ NF-e Nº ${n.numero_nf} pertence a ${empresaSugestao} (CNPJ ${n.cnpj_emitente || '?'}) e NÃO ao contrato aberto (${atual.nome_empresa}).`);
+                    }
+                });
+            }
+
+            if (avisos.length > 0) {
+                const el = document.getElementById('xmlErrosGerais');
+                el.innerHTML = avisos.map(a => `<div class="mb-1">${a}</div>`).join('');
+            } else {
+                document.getElementById('xmlErrosGerais').innerText = '';
+            }
 
             if (xmlsProcessados.length > 0) {
                 document.getElementById('xmlUpload').classList.add('hidden');
