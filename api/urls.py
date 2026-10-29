@@ -36,6 +36,9 @@ urlpatterns = [
     path("importar_itens", views.importar_itens, name="importar_itens"),
     path("verificar_planilha_contrato", views.verificar_planilha, name="verificar_planilha"),
     path("importar_lista_mestra", views.importar_lista_mestra, name="importar_lista_mestra"),
+    path("empresas", views.lista_empresas, name="lista_empresas"),
+    path("empresa/<int:empresa_id>", views.excluir_empresa, name="excluir_empresa"),
+    path("empresas/todas", views.excluir_todas_empresas, name="excluir_todas_empresas"),
 
     # Lançamento manual / texto IA
     path("nfse/analisar_texto", views.analisar_texto_ia, name="analisar_texto_ia"),

@@ -223,6 +223,23 @@ def conciliar_item_inteligente(item_xml, itens_contrato, numero_nf_atual=""):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def lista_empresas(request):
+    """Lista todas as empresas com contagem de contratos para gerenciamento."""
+    empresas = Empresa.objects.all()
+    resultado = []
+    for e in empresas:
+        qtd_contratos = e.contratos.count()
+        resultado.append({
+            "id": e.id,
+            "razao_social": e.razao_social,
+            "cnpj": e.cnpj,
+            "qtd_contratos": qtd_contratos,
+        })
+    return json_response(resultado)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def lista_contratos(request):
     """Lista todos os contratos com contagens para o dashboard."""
     contratos = Contrato.objects.select_related('empresa').all()
@@ -527,6 +544,43 @@ def zerar_aditivo(request, item_id):
         return json_response({"ok": True})
     except Exception as e:
         return error_response(f"Erro ao zerar aditivo: {str(e)}", 500)
+
+
+# ============================================================================
+# EMPRESAS
+# ============================================================================
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def excluir_empresa(request, empresa_id):
+    """Exclui uma empresa e todos os seus contratos, itens e notas."""
+    try:
+        empresa = get_object_or_404(Empresa, pk=empresa_id)
+        with transaction.atomic():
+            # Exclui notas dos contratos da empresa
+            for contrato in empresa.contratos.all():
+                contrato.notas.all().delete()
+                contrato.itens.all().delete()
+            empresa.contratos.all().delete()
+            empresa.delete()
+        return json_response({"ok": True})
+    except Exception as e:
+        return error_response(f"Erro ao excluir empresa: {str(e)}", 500)
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def excluir_todas_empresas(request):
+    """Exclui todas as empresas e todos os dados associados."""
+    try:
+        with transaction.atomic():
+            NotaFiscal.objects.all().delete()
+            ItemContrato.objects.all().delete()
+            Contrato.objects.all().delete()
+            Empresa.objects.all().delete()
+        return json_response({"ok": True})
+    except Exception as e:
+        return error_response(f"Erro ao excluir todas as empresas: {str(e)}", 500)
 
 
 # ============================================================================

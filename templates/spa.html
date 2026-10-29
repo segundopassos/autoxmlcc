@@ -41,8 +41,11 @@
             <button type="button" onclick="abrirModalCadastro()" class="w-full flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium px-4 py-2.5 rounded-xl mb-2.5 text-xs transition border border-slate-700">
                 <i class="fa-solid fa-building text-indigo-400 w-4"></i> Cadastrar Empresa
             </button>
-            <button type="button" onclick="abrirModalExcel()" class="w-full flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-medium px-4 py-2.5 rounded-xl mb-6 text-xs transition border border-slate-700">
+            <button type="button" onclick="abrirModalExcel()" class="w-full flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-medium px-4 py-2.5 rounded-xl mb-2.5 text-xs transition border border-slate-700">
                 <i class="fa-solid fa-file-excel w-4"></i> Subir Planilha de Itens
+            </button>
+            <button type="button" onclick="abrirModalGerenciarEmpresas()" class="w-full flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-red-400 font-medium px-4 py-2.5 rounded-xl mb-6 text-xs transition border border-slate-700">
+                <i class="fa-solid fa-trash-can w-4"></i> Gerenciar Empresas
             </button>
 
             <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 mb-2">Lançamento de Notas</div>
@@ -232,6 +235,25 @@
                     <p class="text-[10px] text-slate-400 mt-1">Formato: .xlsx (Excel)</p>
                 </div>
                 <div id="resultadoListaMestra" class="hidden mt-3 p-3 rounded-lg text-xs"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL GERENCIAR EMPRESAS -->
+    <div id="modalGerenciarEmpresas" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl w-[600px] max-h-[80vh] flex flex-col p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-800">Gerenciar Empresas</h3>
+                <button onclick="fecharModalGerenciarEmpresas()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="buscaEmpresaGerenciar" placeholder="Buscar empresa..." oninput="filtrarListaEmpresas()" class="flex-1 border rounded-lg p-2 text-sm">
+                <button onclick="confirmarExcluirTodasEmpresas()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg whitespace-nowrap">
+                    <i class="fa-solid fa-trash-can mr-1"></i> Apagar Todas
+                </button>
+            </div>
+            <div id="listaEmpresasGerenciar" class="flex-1 overflow-y-auto space-y-2">
+                <p class="text-center text-slate-400 text-xs py-8">Carregando...</p>
             </div>
         </div>
     </div>
@@ -554,72 +576,32 @@
                 d.innerHTML = '<div class="col-span-full bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-xs">Nenhum contrato encontrado para este filtro.</div>';
                 return;
             }
-
-            // Agrupa por empresa (estilo pastas)
-            const grupos = {};
-            lista.forEach(c => {
-                const chave = c.nome_empresa || 'Sem Empresa';
-                if (!grupos[chave]) grupos[chave] = [];
-                grupos[chave].push(c);
-            });
-
-            // Ordena empresas alfabeticamente
-            const empresasOrdenadas = Object.keys(grupos).sort((a, b) => a.localeCompare(b));
-
             let htmlBatch = '';
-            empresasOrdenadas.forEach(nomeEmpresa => {
-                const contratosEmpresa = grupos[nomeEmpresa];
-                const idGrupo = 'grupo_' + nomeEmpresa.replace(/[^a-zA-Z0-9]/g, '_');
-                const qtdAtivos = contratosEmpresa.filter(c => c.status !== 'VENCIDO').length;
-                const qtdVencidos = contratosEmpresa.filter(c => c.status === 'VENCIDO').length;
+            for (let i = 0; i < lista.length; i++) {
+                const c = lista[i];
+                const isVenc = c.status === 'VENCIDO';
+                const badgeStatus = isVenc
+                    ? '<span class="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-md">VENCIDO</span>'
+                    : '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">ATIVO</span>';
 
-                htmlBatch += `<div class="col-span-full mb-4">
-                    <div class="flex items-center gap-3 mb-3 cursor-pointer group" onclick="toggleGrupo('${idGrupo}')">
-                        <i class="fa-solid fa-folder${contratosEmpresa.length > 0 ? '-open' : ''} text-amber-500 text-lg group-hover:text-amber-600 transition"></i>
-                        <h3 class="text-sm font-bold text-slate-800 group-hover:text-indigo-700 transition">${nomeEmpresa}</h3>
-                        <span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">${contratosEmpresa.length} contrato${contratosEmpresa.length > 1 ? 's' : ''}</span>
-                        ${qtdAtivos > 0 ? `<span class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">${qtdAtivos} ativo${qtdAtivos > 1 ? 's' : ''}</span>` : ''}
-                        ${qtdVencidos > 0 ? `<span class="text-[10px] font-bold bg-red-50 text-red-700 px-2 py-0.5 rounded-full">${qtdVencidos} vencido${qtdVencidos > 1 ? 's' : ''}</span>` : ''}
-                        <i class="fa-solid fa-chevron-down text-slate-400 text-xs ml-auto transition transform" id="chevron_${idGrupo}"></i>
-                    </div>
-                    <div id="${idGrupo}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 ml-6 border-l-2 border-amber-200 pl-4">`;
-
-                contratosEmpresa.forEach(c => {
-                    const isVenc = c.status === 'VENCIDO';
-                    const badgeStatus = isVenc
-                        ? '<span class="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-md">VENCIDO</span>'
-                        : '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">ATIVO</span>';
-
-                    htmlBatch += `<div class="contrato-card bg-white border ${isVenc ? 'border-red-200' : 'border-slate-200'} rounded-xl p-3 cursor-pointer hover:border-indigo-500 hover:shadow-md transition" onclick="abrir(${c.id})">
+                htmlBatch += `<div class="contrato-card bg-white border ${isVenc ? 'border-red-200' : 'border-slate-200'} rounded-2xl p-4 cursor-pointer hover:border-indigo-500 hover:shadow-md transition flex flex-col justify-between" onclick="abrir(${c.id})">
+                    <div>
                         <div class="flex items-center justify-between gap-2 mb-2">
-                            <span class="text-[11px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg truncate max-w-[70%]" title="Contrato Nº ${c.numero_contrato}">${c.numero_contrato}</span>
+                            <span class="text-xs font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-lg">Contrato Nº ${c.numero_contrato}</span>
                             ${badgeStatus}
                         </div>
-                        <div class="text-[11px] text-slate-500 space-y-1">
-                            <div class="flex justify-between items-center">
-                                <span>Venc: <strong class="text-slate-700">${formatarDataBR(c.data_fim)}</strong></span>
-                                <span class="font-bold ${c.total_itens > 0 ? 'text-indigo-600' : 'text-slate-400'}">${c.total_itens} itens</span>
-                            </div>
+                        <h4 class="font-bold text-slate-800 text-xs leading-snug break-words mb-2">${c.nome_empresa}</h4>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
+                        <div class="font-mono text-slate-600">CNPJ: ${formatarCNPJ(c.cnpj)}</div>
+                        <div class="flex justify-between items-center">
+                            <span>Venc: <strong>${formatarDataBR(c.data_fim)}</strong></span>
+                            <span class="font-bold ${c.total_itens > 0 ? 'text-indigo-600' : 'text-slate-400'}">${c.total_itens} itens</span>
                         </div>
-                    </div>`;
-                });
-
-                htmlBatch += `</div></div>`;
-            });
-
-            d.innerHTML = htmlBatch;
-        }
-
-        function toggleGrupo(idGrupo) {
-            const el = document.getElementById(idGrupo);
-            const chevron = document.getElementById('chevron_' + idGrupo);
-            if (el.classList.contains('hidden')) {
-                el.classList.remove('hidden');
-                chevron.classList.remove('rotate-[-90deg]');
-            } else {
-                el.classList.add('hidden');
-                chevron.classList.add('rotate-[-90deg]');
+                    </div>
+                </div>`;
             }
+            d.innerHTML = htmlBatch;
         }
 
         async function abrir(id) {
@@ -712,6 +694,82 @@
 
         function abrirModalCadastro() { document.getElementById('modalCadastro').classList.remove('hidden'); }
         function fecharModalCadastro() { document.getElementById('formCadastroManual').reset(); document.getElementById('modalCadastro').classList.add('hidden'); }
+
+        // === GERENCIAR EMPRESAS ===
+        let empresasCache = [];
+        function abrirModalGerenciarEmpresas() {
+            document.getElementById('modalGerenciarEmpresas').classList.remove('hidden');
+            document.getElementById('buscaEmpresaGerenciar').value = '';
+            carregarListaEmpresas();
+        }
+        function fecharModalGerenciarEmpresas() {
+            document.getElementById('modalGerenciarEmpresas').classList.add('hidden');
+        }
+        async function carregarListaEmpresas() {
+            const container = document.getElementById('listaEmpresasGerenciar');
+            container.innerHTML = '<p class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Carregando...</p>';
+            try {
+                const resp = await fetch('/api/empresas');
+                empresasCache = await resp.json();
+                renderizarListaEmpresas(empresasCache);
+            } catch(e) {
+                container.innerHTML = '<p class="text-center text-red-500 text-xs py-8">Erro ao carregar empresas.</p>';
+            }
+        }
+        function filtrarListaEmpresas() {
+            const termo = document.getElementById('buscaEmpresaGerenciar').value.toLowerCase();
+            const filtradas = empresasCache.filter(e =>
+                e.razao_social.toLowerCase().includes(termo) || e.cnpj.includes(termo)
+            );
+            renderizarListaEmpresas(filtradas);
+        }
+        function renderizarListaEmpresas(lista) {
+            const container = document.getElementById('listaEmpresasGerenciar');
+            if (lista.length === 0) {
+                container.innerHTML = '<p class="text-center text-slate-400 text-xs py-8">Nenhuma empresa encontrada.</p>';
+                return;
+            }
+            let html = '';
+            lista.forEach(e => {
+                html += `<div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-red-300 transition">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-sm text-slate-800 truncate">${e.razao_social}</div>
+                        <div class="text-[11px] text-slate-500 font-mono">${formatarCNPJ(e.cnpj)} &bull; ${e.qtd_contratos} contrato${e.qtd_contratos !== 1 ? 's' : ''}</div>
+                    </div>
+                    <button onclick="confirmarExcluirEmpresa(${e.id}, '${e.razao_social.replace(/'/g, "\\'")}')" class="ml-3 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg whitespace-nowrap transition">
+                        <i class="fa-solid fa-trash-can mr-1"></i> Apagar
+                    </button>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+        async function confirmarExcluirEmpresa(id, nome) {
+            if (!confirm(`ATENÇÃO: Deseja apagar a empresa "${nome}" e TODOS os seus contratos, itens e notas? Esta ação não pode ser desfeita.`)) return;
+            try {
+                const resp = await fetch(`/api/empresa/${id}`, { method: 'DELETE' });
+                const data = await resp.json();
+                if (data.ok) {
+                    carregarListaEmpresas();
+                    init(); // recarrega dashboard
+                } else {
+                    alert(data.erro || 'Erro ao excluir empresa.');
+                }
+            } catch(e) { alert('Erro de conexão: ' + e.message); }
+        }
+        async function confirmarExcluirTodasEmpresas() {
+            if (!confirm('ATENÇÃO: Deseja apagar TODAS as empresas, contratos, itens e notas do sistema? Esta ação não pode ser desfeita.')) return;
+            if (!confirm('CONFIRMAÇÃO FINAL: Tem certeza absoluta? Todos os dados serão perdidos permanentemente.')) return;
+            try {
+                const resp = await fetch('/api/empresas/todas', { method: 'DELETE' });
+                const data = await resp.json();
+                if (data.ok) {
+                    carregarListaEmpresas();
+                    init(); // recarrega dashboard
+                } else {
+                    alert(data.erro || 'Erro ao excluir todas as empresas.');
+                }
+            } catch(e) { alert('Erro de conexão: ' + e.message); }
+        }
 
         async function importarListaMestra(inputEl) {
             const arquivo = inputEl.files[0];
