@@ -859,17 +859,29 @@ def processar_xml_individual(conteudo, contexto_id=None):
             vUnCom = round(float(prod.find('nfe:vUnCom', ns).text), 4) if prod.find('nfe:vUnCom', ns) is not None else 0.0
             itens_xml.append({"desc_xml": xProd, "qtd_xml": qCom, "val_xml": vUnCom})
 
+        # Verifica duplicidade pela chave de acesso
+        if chave and NotaFiscal.objects.filter(chave_acesso=chave).exists():
+            return {"ok": False, "erro": f"Nota NF-e Nº {numero_nf} (chave {chave[:20]}...) já está cadastrada no sistema.", "duplicata": True}
+
         # Encontra contrato
         contrato = None
+        empresa_encontrada = None
         if contexto_id:
             contrato = Contrato.objects.filter(pk=contexto_id).first()
         elif cnpj_emit:
-            empresa = Empresa.objects.filter(cnpj__icontains=cnpj_emit).first()
-            if empresa:
-                contrato = empresa.contratos.first()
+            # Tenta encontrar empresa pelo CNPJ do emitente
+            empresa_encontrada = Empresa.objects.filter(cnpj__icontains=cnpj_emit).first()
+            if empresa_encontrada:
+                contrato = empresa_encontrada.contratos.first()
 
         if not contrato:
-            return {"ok": False, "erro": "Contrato não encontrado."}
+            return {
+                "ok": False,
+                "erro": f"Contrato não encontrado para o emitente '{razao_emit}' (CNPJ: {cnpj_emit}). Selecione o contrato manualmente ou cadastre a empresa primeiro.",
+                "emitente": razao_emit,
+                "cnpj_emitente": cnpj_emit,
+                "contrato_nao_encontrado": True,
+            }
 
         itens_contrato = []
         for it in contrato.itens.all():
@@ -1420,7 +1432,7 @@ def extrair_itens_de_texto(texto):
 @csrf_exempt
 @require_http_methods(["GET"])
 def pdf_relatorio_contrato(request):
-    """Gera relatório PDF de saldos do contrato."""
+    """Gera relatório PDF de saldos do contrato com opções configuráveis."""
     try:
         contrato_id = request.GET.get('contrato_id')
         if not contrato_id:
@@ -1428,10 +1440,21 @@ def pdf_relatorio_contrato(request):
 
         contrato = get_object_or_404(Contrato.objects.select_related('empresa'), pk=contrato_id)
 
-        # Gera HTML do relatório (simplificado)
-        html = gerar_html_relatorio(contrato)
+        # Lê opções do frontend
+        incluir_esgotados = request.GET.get('incluir_esgotados', '1') == '1'
+        detalhe_financeiro = request.GET.get('detalhe_financeiro', '1') == '1'
+        totalizador = request.GET.get('totalizador', '1') == '1'
+        incluir_aditivo = request.GET.get('incluir_aditivo', '1') == '1'
 
-        response = HttpResponse(html, content_type='text/html')
+        html = gerar_html_relatorio(
+            contrato,
+            incluir_esgotados=incluir_esgotados,
+            detalhe_financeiro=detalhe_financeiro,
+            totalizador=totalizador,
+            incluir_aditivo=incluir_aditivo,
+        )
+
+        response = HttpResponse(html, content_type='text/html; charset=utf-8')
         response['Content-Disposition'] = f'inline; filename="relatorio_{contrato.numero}.html"'
         return response
 
@@ -1439,11 +1462,12 @@ def pdf_relatorio_contrato(request):
         return error_response(f"Erro ao gerar relatório: {str(e)}", 500)
 
 
-def gerar_html_relatorio(contrato):
-    """Gera HTML do relatório de saldos."""
+def gerar_html_relatorio(contrato, incluir_esgotados=True, detalhe_financeiro=True, totalizador=True, incluir_aditivo=True):
+    """Gera HTML do relatório de saldos com encoding UTF-8 correto."""
     itens_html = ""
     total_faturado = 0
     total_disponivel = 0
+    total_contratado_val = 0
 
     for it in contrato.itens.all():
         preco = it.precos.order_by("-vigente_a_partir_de").first()
@@ -1452,71 +1476,111 @@ def gerar_html_relatorio(contrato):
         disp_qtd = qtd_total - float(it.qnt_faturada)
         fat_real = float(it.qnt_faturada) * val_unit
         val_disp = max(0, (qtd_total * val_unit) - fat_real)
+        val_contratado = qtd_total * val_unit
+
+        # Se não incluir esgotados e o item está zerado/esgotado, pula
+        if not incluir_esgotados and disp_qtd <= 0:
+            continue
 
         total_faturado += fat_real
         total_disponivel += val_disp
+        total_contratado_val += val_contratado
 
         cor_linha = "background:#fff1f2;" if disp_qtd <= 0 else ""
+        col_aditivo = f"<td style='border:1px solid #444; padding:3px 5px; text-align:right;'>{format_int_qtd(it.qnt_aditivada) if it.qnt_aditivada else '-'}</td>" if incluir_aditivo else ""
+        col_financeiro = ""
+        if detalhe_financeiro:
+            col_financeiro = f"""
+            <td style='border:1px solid #444; padding:3px 5px; text-align:right;'>R$ {format_br(val_unit)}</td>
+            <td style='border:1px solid #444; padding:3px 5px; text-align:right;'>R$ {format_br(fat_real)}</td>
+            <td style='border:1px solid #444; padding:3px 5px; text-align:right; font-weight:bold;'>R$ {format_br(val_disp)}</td>"""
+
         itens_html += f"""
         <tr style='{cor_linha}'>
             <td style='border:1px solid #444; padding:3px 5px; text-align:center;'>{it.numero_item}</td>
             <td style='border:1px solid #444; padding:3px 5px;'>{it.descricao}</td>
             <td style='border:1px solid #444; padding:3px 5px; text-align:right;'>{format_int_qtd(it.quantidade_contratada)}</td>
-            <td style='border:1px solid #444; padding:3px 5px; text-align:right;'>{format_int_qtd(it.qnt_aditivada) if it.qnt_aditivada else '-'}</td>
+            {col_aditivo}
             <td style='border:1px solid #444; padding:3px 5px; text-align:right;'>{format_int_qtd(it.qnt_faturada)}</td>
             <td style='border:1px solid #444; padding:3px 5px; text-align:right; font-weight:bold;'>{format_int_qtd(disp_qtd)}</td>
-            <td style='border:1px solid #444; padding:3px 5px; text-align:right;'>R$ {format_br(val_unit)}</td>
-            <td style='border:1px solid #444; padding:3px 5px; text-align:right;'>R$ {format_br(fat_real)}</td>
-            <td style='border:1px solid #444; padding:3px 5px; text-align:right; font-weight:bold;'>R$ {format_br(val_disp)}</td>
+            {col_financeiro}
         </tr>
         """
 
-    return f"""
-    <html><head><title>Relatório - {contrato.empresa.razao_social}</title>
-    <style>
-        @page {{ size: A4 portrait; margin: 8mm; }}
-        body {{ font-family: Arial, sans-serif; font-size: 10px; color: #111; margin: 0; padding: 0; }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        tr {{ page-break-inside: avoid; }}
-        thead {{ display: table-header-group; }}
-    </style>
-    </head>
-    <body onload='window.print()'>
-        <div style='border-bottom:2px solid #0f4c81; padding-bottom:6px; margin-bottom:8px;'>
-            <div style='font-size:12px; font-weight:900; color:#0f4c81;'>SECRETARIA MUNICIPAL DE SAÚDE DE CAMPO MAIOR</div>
-            <div style='font-size:10px; font-weight:bold; color:#333;'>CNPJ: 11.753.492/0001-02</div>
-            <div style='font-size:11px; font-weight:bold; margin-top:2px;'>RELATÓRIO DE SALDOS CONTRATUAIS</div>
-        </div>
-        <div style='margin-bottom:8px;'>
-            <strong>Contratada:</strong> {contrato.empresa.razao_social}<br>
-            <strong>CNPJ:</strong> {formatar_cnpj(contrato.empresa.cnpj)}<br>
-            <strong>Contrato Nº:</strong> {contrato.numero}
-        </div>
-        <table>
-            <thead>
-                <tr style='background:#e2e8f0; font-size:9.5px;'>
-                    <th style='border:1px solid #444; padding:4px;'>Nº</th>
-                    <th style='border:1px solid #444; padding:4px; text-align:left;'>Descrição</th>
-                    <th style='border:1px solid #444; padding:4px; text-align:right;'>Contrat.</th>
-                    <th style='border:1px solid #444; padding:4px; text-align:right;'>Aditivo</th>
-                    <th style='border:1px solid #444; padding:4px; text-align:right;'>Faturado</th>
-                    <th style='border:1px solid #444; padding:4px; text-align:right;'>Saldo Disp.</th>
+    # Monta cabeçalho dinâmico
+    th_aditivo = "<th style='border:1px solid #444; padding:4px; text-align:right;'>Aditivo</th>" if incluir_aditivo else ""
+    th_financeiro = ""
+    if detalhe_financeiro:
+        th_financeiro = """
                     <th style='border:1px solid #444; padding:4px; text-align:right;'>V. Unit.</th>
                     <th style='border:1px solid #444; padding:4px; text-align:right;'>Faturado (R$)</th>
-                    <th style='border:1px solid #444; padding:4px; text-align:right;'>Saldo (R$)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {itens_html}
-                <tr style='background:#f8fafc; font-weight:bold;'>
-                    <td colspan='7' style='border:1px solid #444; padding:5px; text-align:right;'>TOTAIS:</td>
+                    <th style='border:1px solid #444; padding:4px; text-align:right;'>Saldo (R$)</th>"""
+
+    # Colspan do totalizador
+    cols_base = 4  # Nº, Descrição, Contrat., Faturado, Saldo Disp.
+    if incluir_aditivo:
+        cols_base += 1
+    colspan_totais = cols_base if not detalhe_financeiro else cols_base
+
+    row_totais = ""
+    if totalizador:
+        td_financeiro_totais = ""
+        if detalhe_financeiro:
+            td_financeiro_totais = f"""
                     <td style='border:1px solid #444; padding:5px; text-align:right;'>R$ {format_br(total_faturado)}</td>
-                    <td style='border:1px solid #444; padding:5px; text-align:right; color:#047857;'>R$ {format_br(total_disponivel)}</td>
-                </tr>
-            </tbody>
-        </table>
-    </body></html>
-    """
+                    <td style='border:1px solid #444; padding:5px; text-align:right; color:#047857;'>R$ {format_br(total_disponivel)}</td>"""
+        row_totais = f"""
+                <tr style='background:#f8fafc; font-weight:bold;'>
+                    <td colspan='{colspan_totais}' style='border:1px solid #444; padding:5px; text-align:right;'>TOTAIS:</td>
+                    {td_financeiro_totais}
+                </tr>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Relatório - {contrato.empresa.razao_social}</title>
+<style>
+    @page {{ size: A4 portrait; margin: 8mm; }}
+    body {{ font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #111; margin: 0; padding: 0; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    tr {{ page-break-inside: avoid; }}
+    thead {{ display: table-header-group; }}
+</style>
+</head>
+<body onload='window.print()'>
+    <div style='border-bottom:2px solid #0f4c81; padding-bottom:6px; margin-bottom:8px;'>
+        <div style='font-size:12px; font-weight:900; color:#0f4c81;'>SECRETARIA MUNICIPAL DE SAÚDE DE CAMPO MAIOR</div>
+        <div style='font-size:10px; font-weight:bold; color:#333;'>CNPJ: 11.753.492/0001-02</div>
+        <div style='font-size:11px; font-weight:bold; margin-top:2px;'>RELATÓRIO DE SALDOS CONTRATUAIS</div>
+    </div>
+    <div style='margin-bottom:8px;'>
+        <strong>Contratada:</strong> {contrato.empresa.razao_social}<br>
+        <strong>CNPJ:</strong> {formatar_cnpj(contrato.empresa.cnpj)}<br>
+        <strong>Contrato Nº:</strong> {contrato.numero}<br>
+        <strong>Vigência:</strong> {contrato.inicio_vigencia.strftime('%d/%m/%Y') if contrato.inicio_vigencia else '-'} a {contrato.fim_vigencia.strftime('%d/%m/%Y') if contrato.fim_vigencia else '-'}
+    </div>
+    <table>
+        <thead>
+            <tr style='background:#e2e8f0; font-size:9.5px;'>
+                <th style='border:1px solid #444; padding:4px;'>Nº</th>
+                <th style='border:1px solid #444; padding:4px; text-align:left;'>Descrição</th>
+                <th style='border:1px solid #444; padding:4px; text-align:right;'>Contrat.</th>
+                {th_aditivo}
+                <th style='border:1px solid #444; padding:4px; text-align:right;'>Faturado</th>
+                <th style='border:1px solid #444; padding:4px; text-align:right;'>Saldo Disp.</th>
+                {th_financeiro}
+            </tr>
+        </thead>
+        <tbody>
+            {itens_html}
+            {row_totais}
+        </tbody>
+    </table>
+    <div style='margin-top:12px; font-size:8px; color:#666; text-align:center;'>
+        Gerado em {timezone.now().strftime('%d/%m/%Y %H:%M')} &bull; Sistema de Gestão de Contratos SMS Campo Maior
+    </div>
+</body></html>"""
 
 
 @csrf_exempt
