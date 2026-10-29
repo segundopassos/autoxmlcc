@@ -1036,6 +1036,16 @@ def importar_itens(request):
             return error_response("Nenhum item válido encontrado na planilha.")
 
         with transaction.atomic():
+            # Se não estiver em modo somar, limpa itens existentes antes de importar
+            if not modo_somar:
+                contrato.itens.all().delete()
+
+            # Encontra o maior numero_item existente para gerar sequência única
+            max_num = ItemContrato.objects.filter(contrato=contrato).aggregate(
+                m=models.Max('numero_item')
+            )['m'] or 0
+            seq_counter = max_num + 1
+
             for it_data in itens_extraidos:
                 if modo_somar:
                     # Tenta encontrar item existente pelo número ou descrição
@@ -1065,13 +1075,31 @@ def importar_itens(request):
                         item_existente.save()
                         continue
 
-                # Cria novo item
+                # Gera numero_item único: usa o da planilha se válido (>0), senão usa sequência
+                num_item_raw = it_data.get('item_num', '') or 0
+                try:
+                    num_item = int(num_item_raw)
+                except (ValueError, TypeError):
+                    num_item = 0
+
+                lote_val = it_data.get('lote', '') or ''
+
+                # Se numero_item é 0 ou já existe com mesmo lote, usa sequência
+                if num_item <= 0 or ItemContrato.objects.filter(
+                    contrato=contrato, numero_item=num_item, lote=lote_val
+                ).exists():
+                    num_item = seq_counter
+                    seq_counter += 1
+
+                # Garante quantidade mínima de 0.0001 para passar no CheckConstraint
+                quant_val = it_data['quant'] if it_data['quant'] and float(it_data['quant']) > 0 else 1
+
                 item = ItemContrato.objects.create(
                     contrato=contrato,
-                    lote=it_data.get('lote', ''),
-                    numero_item=it_data.get('item_num', '') or 0,
+                    lote=lote_val,
+                    numero_item=num_item,
                     descricao=it_data['descricao'],
-                    quantidade_contratada=Decimal(str(it_data['quant'] or 0)),
+                    quantidade_contratada=Decimal(str(quant_val)),
                     qnt_aditivada=Decimal("0"),
                     qnt_faturada_base=Decimal(str(it_data['qnt_comprada'] or 0)),
                     qnt_faturada=Decimal(str(it_data['qnt_comprada'] or 0)),
