@@ -121,13 +121,15 @@
 </div>
 
 <div class="header-title">
-  Ordem de Fornecimento de Material / Serviço{% if of.numero %} Nº {{ of.numero }}/{{ of.ano }}{% endif %}
+  SECRETARIA MUNICIPAL DE SA&Uacute;DE DE CAMPO MAIOR<br>
+  <span style="font-size:10pt; text-transform:none;">CNPJ: 11.753.492/0001-02</span><br>
+  Ordem de Fornecimento de Material / Servi&ccedil;o{% if of.numero %} N&ordm; {{ of.numero }}/{{ of.ano }}{% endif %}
 </div>
 
 <div class="info-block">
   <div class="info-row">
     <span class="info-label">Contratante:</span>
-    <span>{{ contratante.nome|default:"Fundo Municipal de Saúde de Campo Maior" }}</span>
+    <span>{{ contratante.nome|default:"Secretaria Municipal de Sa&uacute;de de Campo Maior" }}</span>
   </div>
   <div class="info-row">
     <span class="info-label">CNPJ Contratante:</span>
@@ -151,7 +153,7 @@
   </div>
   <div class="info-row">
     <span class="info-label">Nota Fiscal:</span>
-    <span>Nº {{ nota.numero }}{% if nota.serie %} — Série {{ nota.serie }}{% endif %}</span>
+    <span>N&ordm; {{ nota.numero }}{% if nota.serie %} &mdash; S&eacute;rie {{ nota.serie }}{% endif %}</span>
   </div>
   <div class="info-row">
     <span class="info-label">Data de Emissão:</span>
@@ -166,7 +168,7 @@
 <table class="itens">
   <thead>
     <tr>
-      <th style="width:40px;">Nº</th>
+      <th style="width:40px;">N&ordm;</th>
       <th style="width:50px;">Qtd.</th>
       <th style="width:40px;">Un.</th>
       <th>Especificação</th>
@@ -214,8 +216,8 @@
 </div>
 
 <div class="rodape">
-  Fundo Municipal de Saúde de Campo Maior — CNPJ 11.753.492/0001-02<br>
-  Rua Vereador Chico Caxeiro, S/N — N.S. de Fátima — Campo Maior-PI — CEP 64280-000
+  Secretaria Municipal de Sa&uacute;de de Campo Maior &mdash; CNPJ 11.753.492/0001-02<br>
+  Rua Vereador Chico Caxeiro, S/N &mdash; N.S. de F&aacute;tima &mdash; Campo Maior-PI &mdash; CEP 64280-000
 </div>
 
 </body>

@@ -1583,21 +1583,21 @@ def gerar_html_relatorio(contrato, incluir_esgotados=True, detalhe_financeiro=Tr
 </head>
 <body onload='window.print()'>
     <div style='border-bottom:2px solid #0f4c81; padding-bottom:6px; margin-bottom:8px;'>
-        <div style='font-size:12px; font-weight:900; color:#0f4c81;'>SECRETARIA MUNICIPAL DE SAÚDE DE CAMPO MAIOR</div>
+        <div style='font-size:12px; font-weight:900; color:#0f4c81;'>SECRETARIA MUNICIPAL DE SA&Uacute;DE DE CAMPO MAIOR</div>
         <div style='font-size:10px; font-weight:bold; color:#333;'>CNPJ: 11.753.492/0001-02</div>
-        <div style='font-size:11px; font-weight:bold; margin-top:2px;'>RELATÓRIO DE SALDOS CONTRATUAIS</div>
+        <div style='font-size:11px; font-weight:bold; margin-top:2px;'>RELAT&Oacute;RIO DE SALDOS CONTRATUAIS</div>
     </div>
     <div style='margin-bottom:8px;'>
         <strong>Contratada:</strong> {contrato.empresa.razao_social}<br>
         <strong>CNPJ:</strong> {formatar_cnpj(contrato.empresa.cnpj)}<br>
-        <strong>Contrato Nº:</strong> {contrato.numero}<br>
-        <strong>Vigência:</strong> {contrato.inicio_vigencia.strftime('%d/%m/%Y') if contrato.inicio_vigencia else '-'} a {contrato.fim_vigencia.strftime('%d/%m/%Y') if contrato.fim_vigencia else '-'}
+        <strong>Contrato N&ordm;:</strong> {contrato.numero}<br>
+        <strong>Vig&ecirc;ncia:</strong> {contrato.inicio_vigencia.strftime('%d/%m/%Y') if contrato.inicio_vigencia else '-'} a {contrato.fim_vigencia.strftime('%d/%m/%Y') if contrato.fim_vigencia else '-'}
     </div>
     <table>
         <thead>
             <tr style='background:#e2e8f0; font-size:9.5px;'>
-                <th style='border:1px solid #444; padding:4px;'>Nº</th>
-                <th style='border:1px solid #444; padding:4px; text-align:left;'>Descrição</th>
+                <th style='border:1px solid #444; padding:4px;'>N&ordm;</th>
+                <th style='border:1px solid #444; padding:4px; text-align:left;'>Descri&ccedil;&atilde;o</th>
                 <th style='border:1px solid #444; padding:4px; text-align:right;'>Contrat.</th>
                 {th_aditivo}
                 <th style='border:1px solid #444; padding:4px; text-align:right;'>Faturado</th>
@@ -1677,7 +1677,7 @@ def pdf_of_lote(request):
             <div style='padding:2px 0; page-break-after: always;'>
                 <div style='display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #0f4c81; padding-bottom:5px; margin-bottom:8px;'>
                     <div>
-                        <div style='font-size:12px; font-weight:900; color:#0f4c81;'>SECRETARIA MUNICIPAL DE SAÚDE DE CAMPO MAIOR</div>
+                        <div style='font-size:12px; font-weight:900; color:#0f4c81;'>SECRETARIA MUNICIPAL DE SA&Uacute;DE DE CAMPO MAIOR</div>
                         <div style='font-size:10px; font-weight:bold; color:#222;'>CNPJ: 11.753.492/0001-02</div>
                     </div>
                     <div style='font-size:12px; font-weight:900; color:#111; border:1.5px solid #111; padding:3px 7px; border-radius:4px;'>ORDEM DE FORNECIMENTO</div>
@@ -1685,7 +1685,7 @@ def pdf_of_lote(request):
 
                 <table style='width:100%; font-size:10px; margin-bottom:8px; border:1px solid #999; background:#f8fafc;'>
                     <tr>
-                        <td style='padding:3px 6px;'><strong>CONTRATANTE:</strong> SMS Campo Maior</td>
+                        <td style='padding:3px 6px;'><strong>CONTRATANTE:</strong> Secretaria Municipal de Sa&uacute;de de Campo Maior</td>
                         <td style='padding:3px 6px; text-align:right;'><strong>CNPJ:</strong> 11.753.492/0001-02</td>
                     </tr>
                     <tr>
@@ -1693,7 +1693,7 @@ def pdf_of_lote(request):
                         <td style='padding:3px 6px; text-align:right; border-top:1px solid #ddd;'><strong>CNPJ:</strong> {formatar_cnpj(nota.contrato.empresa.cnpj)}</td>
                     </tr>
                     <tr>
-                        <td style='padding:3px 6px; border-top:1px solid #ddd;' colspan='2'><strong>CONTRATO Nº:</strong> {nota.contrato.numero}</td>
+                        <td style='padding:3px 6px; border-top:1px solid #ddd;' colspan='2'><strong>CONTRATO N&ordm;:</strong> {nota.contrato.numero}</td>
                     </tr>
                 </table>
 
@@ -1701,7 +1701,7 @@ def pdf_of_lote(request):
                     <thead>
                         <tr style='background:#e2e8f0;'>
                             <th style='border:1px solid #333; padding:3px; width:40px;'>Item</th>
-                            <th style='border:1px solid #333; padding:3px; text-align:left;'>Descrição</th>
+                            <th style='border:1px solid #333; padding:3px; text-align:left;'>Descri&ccedil;&atilde;o</th>
                             <th style='border:1px solid #333; padding:3px; width:70px;'>Qtd</th>
                             <th style='border:1px solid #333; padding:3px; width:80px; text-align:right;'>V. Unit.</th>
                             <th style='border:1px solid #333; padding:3px; width:90px; text-align:right;'>Total</th>
@@ -1725,17 +1725,20 @@ def pdf_of_lote(request):
             </div>
             """)
 
-        html_final = f"""
-        <html><head><title>Ordens de Fornecimento ({len(lista_ids)})</title>
+        html_final = f"""<!DOCTYPE html>
+        <html lang="pt-BR"><head>
+        <meta charset="UTF-8">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>Ordens de Fornecimento ({len(lista_ids)})</title>
         <style>
             @page {{ size: A4 portrait; margin: 8mm; }}
-            body {{ font-family: Arial, sans-serif; color: #111; margin: 0; padding: 0; }}
+            body {{ font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 0; }}
             tr {{ page-break-inside: avoid; }}
         </style>
         </head><body onload='window.print()'>{''.join(html_blocos)}</body></html>
         """
 
-        response = HttpResponse(html_final, content_type='text/html')
+        response = HttpResponse(html_final.encode('utf-8'), content_type='text/html; charset=utf-8')
         response['Content-Disposition'] = f'inline; filename="of_lote_{len(lista_ids)}.html"'
         return response
 

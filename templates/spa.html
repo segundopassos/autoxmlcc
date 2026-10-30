@@ -442,7 +442,7 @@
                 <div id="contadoresStatus" class="text-xs font-semibold flex gap-3"></div>
                 <div class="flex gap-2">
                     <button onclick="fecharModalXml()" class="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100">Descartar</button>
-                    <button onclick="confirmarGravacaoXml()" id="btnConfirmarXml" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-sm">Confirmar & Gravar</button>
+                    <button onclick="confirmarGravacaoXml()" id="btnConfirmarXml" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg text-sm">Confirmar e Descontar do Saldo</button>
                 </div>
             </div>
         </div>
@@ -1624,6 +1624,31 @@
             let contOk = 0, contEstouro = 0, contPendente = 0;
 
             xmlsProcessados.forEach((nota, notaIdx) => {
+                // Pula notas descartadas
+                if (nota._descartada) return;
+
+                // Cabeçalho da nota (agrupa os itens)
+                const destinoTxt = nota.contrato_nome || ('Contrato ID ' + nota.contrato_id);
+                tbody.innerHTML += `
+                    <tr class="bg-indigo-50 border-b-2 border-indigo-200">
+                        <td colspan="6" class="p-2.5">
+                            <div class="flex items-center justify-between gap-3 flex-wrap">
+                                <div class="flex items-center gap-2 min-w-0 flex-1">
+                                    <input type="checkbox" class="chkNotaXml w-4 h-4 text-indigo-600 rounded flex-shrink-0" data-nota-idx="${notaIdx}" checked onchange="toggleNotaXml(this)">
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-slate-800 text-xs">Nota Nº ${nota.numero_nf} (${nota.serie || '1'}) — ${nota.emitente || nota.empresa_nome || 'EMITENTE'} (CNPJ: ${nota.cnpj_emitente || '?'})</div>
+                                        <div class="text-[10px] text-slate-600">DESTINO: ${destinoTxt}</div>
+                                    </div>
+                                </div>
+                                <div class="text-xs font-bold text-slate-700 flex-shrink-0">Valor Total NF: R$ ${formatBR(nota.valor_total)}</div>
+                                <button onclick="descartarNotaXml(${notaIdx})" class="text-red-500 hover:text-red-700 text-[10px] font-semibold px-2 py-1 rounded hover:bg-red-50 flex-shrink-0" title="Descartar esta nota">
+                                    <i class="fa-solid fa-trash-can mr-1"></i>Descartar Nota
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
                 nota.itens.forEach((it, itemIdx) => {
                     let badgeClass = 'bg-emerald-100 text-emerald-700';
                     if (it.status_cor === 'red') { badgeClass = 'bg-red-600 text-white font-bold'; contEstouro++; }
@@ -1631,27 +1656,28 @@
                     else if (it.status_cor === 'blue') { badgeClass = 'bg-blue-100 text-blue-700 font-bold'; contOk++; }
                     else { contOk++; }
 
-                    let opcoesSelect = `<option value="">-- Selecione o item correto do contrato --</option>`;
+                    let opcoesSelect = `<option value="">-- Selecione o Item do Contrato --</option>`;
                     if (nota.itens_contrato_disponiveis) {
                         nota.itens_contrato_disponiveis.forEach(op => {
                             const sel = (op.id === it.item_contrato_id) ? 'selected' : '';
-                            opcoesSelect += `<option value="${op.id}" ${sel}>#${op.item_num || '-'} - ${op.descricao} (R$ ${formatBR(op.val_unitario)})</option>`;
+                            const saldoDisp = round4((op.qnt_contratada + op.qnt_aditivada) - op.qnt_faturada);
+                            opcoesSelect += `<option value="${op.id}" ${sel}>#${op.item_num || '-'} ${op.descricao.substring(0, 40)} (Disp: ${formatIntQtd(saldoDisp)} | R$ ${formatBR(op.val_unitario)})</option>`;
                         });
                     }
 
                     tbody.innerHTML += `
-                        <tr class="hover:bg-slate-50 border-b border-slate-100">
-                            <td class="p-2.5 font-medium">${it.desc_xml}</td>
-                            <td class="p-2.5 font-bold text-center">${formatIntQtd(it.qtd_xml)}</td>
-                            <td class="p-2.5">R$ ${formatBR(it.val_xml)}</td>
+                        <tr class="hover:bg-slate-50 border-b border-slate-100 item-nota-${notaIdx}">
+                            <td class="p-2.5 font-medium text-xs">${it.desc_xml}</td>
+                            <td class="p-2.5 font-bold text-center text-xs">${formatIntQtd(it.qtd_xml)}</td>
+                            <td class="p-2.5 text-xs">R$ ${formatBR(it.val_xml)}</td>
                             <td class="p-2.5">
                                 <select onchange="atualizarVinculoManual(${notaIdx}, ${itemIdx}, this.value)" class="w-full text-xs border rounded p-1 bg-white focus:ring-1 focus:ring-indigo-500">
                                     ${opcoesSelect}
                                 </select>
                             </td>
-                            <td class="p-2.5 text-right font-medium">${it.saldo_antes !== null ? formatIntQtd(it.saldo_antes) : '-'}</td>
+                            <td class="p-2.5 text-right font-medium text-xs">${it.saldo_antes !== null && it.saldo_antes !== undefined ? formatIntQtd(it.saldo_antes) : '-'}</td>
                             <td class="p-2.5">
-                                <span class="px-2 py-0.5 rounded-full text-[10px] ${badgeClass}">${it.situacao}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] ${badgeClass}">${it.situacao || 'SELECIONE O ITEM AO LADO'}</span>
                             </td>
                         </tr>
                     `;
@@ -1663,6 +1689,36 @@
                 <span class="text-red-700"><i class="fa-solid fa-circle-exclamation mr-1"></i> Estouro/Esgotado: ${contEstouro}</span>
                 <span class="text-amber-700"><i class="fa-solid fa-circle-question mr-1"></i> Pendente: ${contPendente}</span>
             `;
+        }
+
+        function toggleNotaXml(chk) {
+            const idx = parseInt(chk.dataset.notaIdx);
+            xmlsProcessados[idx]._descartada = !chk.checked;
+            // Esconde/mostra as linhas de itens daquela nota
+            document.querySelectorAll('.item-nota-' + idx).forEach(tr => {
+                tr.style.display = chk.checked ? '' : 'none';
+            });
+            // Atualiza estilo do cabeçalho
+            const headerRow = chk.closest('tr');
+            if (headerRow) {
+                if (!chk.checked) {
+                    headerRow.classList.add('opacity-40', 'line-through');
+                } else {
+                    headerRow.classList.remove('opacity-40', 'line-through');
+                }
+            }
+        }
+
+        function descartarNotaXml(notaIdx) {
+            if (!confirm(`Descartar a Nota Nº ${xmlsProcessados[notaIdx].numero_nf}? Ela não será gravada nem abatida do saldo.`)) return;
+            xmlsProcessados[notaIdx]._descartada = true;
+            renderizarTabelaXmlConferencia();
+            // Verifica se sobrou alguma nota ativa
+            const ativas = xmlsProcessados.filter(n => !n._descartada);
+            if (ativas.length === 0) {
+                alert('Todas as notas foram descartadas.');
+                fecharModalXml();
+            }
         }
 
         function atualizarVinculoManual(notaIdx, itemIdx, novoItemId) {
@@ -1677,8 +1733,17 @@
 
         async function confirmarGravacaoXml() {
             if (!xmlsProcessados || xmlsProcessados.length === 0) return;
+
+            // Filtra apenas as notas que NÃO foram descartadas
+            const notasAtivas = xmlsProcessados.filter(n => !n._descartada);
+
+            if (notasAtivas.length === 0) {
+                alert('Nenhuma nota selecionada para gravar. Todas foram descartadas.');
+                return;
+            }
+
             const payload = {
-                notas: xmlsProcessados.map(n => ({
+                notas: notasAtivas.map(n => ({
                     contrato_id: n.contrato_id,
                     numero_nf: n.numero_nf,
                     serie: n.serie,
@@ -1688,21 +1753,28 @@
                     itens: n.itens
                 }))
             };
-            mostrarLoading('Gravando Notas...', 'Atualizando saldos...');
-            const r = await fetch('/api/xml/gravar_multiplo', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            const d = await r.json();
-            esconderLoading();
-            if (d.ok) {
-                alert('Nota(s) Fiscal(is) gravada(s) e saldos atualizados com sucesso!');
-                fecharModalXml();
-                if (atual) abrir(atual.id);
-                else init();
-            } else {
-                alert('Erro: ' + d.erro);
+
+            mostrarLoading('Gravando Notas...', 'Descontando do saldo e atualizando planilha...');
+            try {
+                const r = await fetch('/api/xml/gravar_multiplo', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const d = await r.json();
+                esconderLoading();
+
+                if (d.ok) {
+                    alert(`Sucesso! ${d.notas_gravadas} Nota(s) Fiscal(is) gravada(s) e saldo atualizado.`);
+                    fecharModalXml();
+                    if (atual) abrir(atual.id);
+                    else init();
+                } else {
+                    alert('Erro ao gravar: ' + (d.erro || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                esconderLoading();
+                alert('Erro de conexão: ' + e.message);
             }
         }
 
